@@ -1,0 +1,8 @@
+target/
+*.swp
+*.swo
+data/
+stage/
+main
+domthieves
+
