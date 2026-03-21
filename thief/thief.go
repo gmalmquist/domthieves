@@ -27,7 +27,6 @@ func NewID() ThiefID {
   return ThiefID(uuid.NewString())
 }
 
-
 type RecruitOffer struct {
   Origin string `json:"origin"`
   Spritesheet string `json:"spritesheet"`

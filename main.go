@@ -3,8 +3,10 @@ package main
 import (
   "domthieves/api"
   "domthieves/thief"
+  "domthieves/names"
 
   "fmt"
+  "log"
 )
 
 func main() {
@@ -12,13 +14,20 @@ func main() {
 
   hostname := ":7007"
 
-  fmt.Printf("serving api on: %v\n", hostname)
+  namegen := names.New()
+  if err := namegen.LoadAll(); err != nil {
+    log.Fatal(err)
+  }
+  fmt.Printf("rname: %v\n",
+    namegen.Generate("charles"))
 
   directory := thief.NewDirectory()
 
   api := api.New()
+  api.NameGen = namegen
   api.Guilds = directory
 
+  fmt.Printf("serving api on: %v\n", hostname)
   api.Serve(hostname)
 }
 

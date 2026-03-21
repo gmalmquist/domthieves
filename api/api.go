@@ -11,6 +11,7 @@ import (
   "domthieves/netutil"
   "domthieves/storeutil"
   "domthieves/thief"
+  "domthieves/names"
 )
 
 const Version string = "0.0.1"
@@ -19,6 +20,7 @@ type Api struct {
   Mux *netutil.Mux
   Health Health
   Guilds *thief.Directory
+  NameGen *names.NameGen
 }
 
 type Health struct {
