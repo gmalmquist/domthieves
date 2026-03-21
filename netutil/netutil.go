@@ -9,6 +9,7 @@ import (
   "io"
   "net/http"
   "regexp"
+  "strings"
 )
 
 
@@ -24,6 +25,7 @@ type Mux struct {
   *http.ServeMux
   StandardHeader http.Header
   AllowAllCors bool
+  CorsCredentials bool
 }
 
 func (mux *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -38,14 +40,16 @@ func (mux *Mux) Handle(route string, f func(*Nu)) {
       }
     }
     if mux.AllowAllCors {
-      origin := nu.r.Header.Get("Origin")
-      if origin == "" {
-        origin = "*"
-      }
-      nu.w.Header().Add("Access-Control-Allow-Origin", origin)
+      nu.AllowAllCors(mux.CorsCredentials)
     }
     f(nu)
   })
+}
+
+func (mux *Mux) AlwaysExposeHeaders(names ...string) {
+  for _, name := range names {
+    mux.StandardHeader.Add("Access-Control-Expose-Headers", name)
+  }
 }
 
 func Wrap(mux *http.ServeMux) *Mux {
@@ -81,6 +85,51 @@ func Handle(
   mux.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
     f(ForRequest(mux, w, r))
   })
+}
+
+func (nu *Nu) AllowAllCors(withCredentials bool) {
+  w, r := nu.Unwrap()
+  origin := r.Header.Get("Origin")
+  if origin == "" {
+    origin = "*"
+  }
+  w.Header().Add("Access-Control-Allow-Origin", origin)
+
+  for _, method := range r.Header.Values("Access-Control-Request-Method") {
+    w.Header().Add("Access-Control-Allow-Method", method)
+  }
+
+  for _, header := range r.Header.Values("Access-Control-Request-Headers") {
+    w.Header().Add("Access-Control-Allow-Headers", header)
+  }
+
+  if origin != "*" && withCredentials {
+    w.Header().Add("Access-Control-Allow-Credentials", "true")
+  }
+
+  nu.ExposeCurrentHeaders()
+}
+
+func (nu *Nu) ExposeCurrentHeaders() {
+  exposeCorsKey := "Access-Control-Expose-Headers"
+  already := map[string]bool{}
+  for _, name := range nu.w.Header().Values(exposeCorsKey) {
+    already[name] = true
+  }
+  expose := []string{}
+  for key, _ := range nu.w.Header() {
+    if already[key] {
+      continue
+    }
+    lower := strings.ToLower(key)
+    if strings.HasPrefix(lower, "allow-") || strings.HasPrefix(lower, "access-") {
+      continue
+    }
+    expose = append(expose, key)
+  }
+  for _, expose := range expose {
+    nu.w.Header().Add(exposeCorsKey, expose)
+  }
 }
 
 func (u *Nu) ReplyErr(code int, err any) {
