@@ -132,7 +132,14 @@ func (nu *Nu) ExposeCurrentHeaders() {
   }
 }
 
-func (u *Nu) ReplyErr(code int, err any) {
+func (u *Nu) ReplyErr(code int, err any, args ...any) {
+  if len(args) > 0 {
+    if s, ok := err.(string); ok {
+      err = fmt.Sprintf(s, args...)
+    } else {
+      err = fmt.Sprintf(fmt.Sprintf("%v", err), args...)
+    }
+  }
   pcode := rutil.ParseErrCode(err)
   if pcode > 0 && pcode < code {
     code = pcode

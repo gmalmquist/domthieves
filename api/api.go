@@ -10,6 +10,7 @@ import (
   "domthieves/config"
   "domthieves/netutil"
   "domthieves/storeutil"
+  "domthieves/thief"
 )
 
 const Version string = "0.0.1"
@@ -17,6 +18,7 @@ const Version string = "0.0.1"
 type Api struct {
   Mux *netutil.Mux
   Health Health
+  Guilds *thief.Directory
 }
 
 type Health struct {
@@ -60,6 +62,54 @@ func (api *Api) Setup() {
     w.Header().Add("Content-Type", "application/javascript; charset=utf-8")
     w.Header().Add("Content-Length", fmt.Sprintf("%v", len(blob)))
     w.Write(blob)
+  })
+
+  mux.Handle("GET /api/guild/{gid}/thief/{tid}", func(nu Nu) {
+    _, r := nu.Unwrap()
+    gid := thief.GuildID(r.PathValue("gid"))
+    tid := thief.ThiefID(r.PathValue("tid"))
+    
+    guild, ok := api.Guilds.Guild(gid)
+    if !ok {
+      nu.ReplyErr(404, "No guild is chartered as '%v'", gid)
+      return
+    }
+
+    thief, ok := guild.Thief(tid)
+    if !ok {
+      nu.ReplyErr(404, "No thief with ID '%v' is a member of the '%v' guild (%v).", tid, guild.Name, guild.ID)
+      return
+    }
+
+    nu.ReplyJson(thief)
+  })
+
+  mux.Handle("GET /api/guild/{gid}/recruit", func(nu Nu) {
+    _, r := nu.Unwrap()
+    gid := thief.GuildID(r.PathValue("gid"))
+    
+    guild, ok := api.Guilds.Guild(gid)
+    if !ok {
+      nu.ReplyErr(404, "No guild is chartered as '%v'", gid)
+      return
+    }
+
+    origin := r.Header.Get("Origin")
+    if origin == "" {
+      origin = "Anonymous"
+    }
+
+    q := r.URL.Query()
+
+    offer := thief.RecruitOffer{
+      Origin: origin,
+      JobDescription: q.Get("job"),
+      Spritesheet: q.Get("spritesheet"),
+    }
+
+    thief := guild.Recruit(offer)
+
+    nu.ReplyJson(thief)
   })
 
   api.Health = Ready()

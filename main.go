@@ -2,6 +2,7 @@ package main
 
 import (
   "domthieves/api"
+  "domthieves/thief"
 
   "fmt"
 )
@@ -13,7 +14,11 @@ func main() {
 
   fmt.Printf("serving api on: %v\n", hostname)
 
+  directory := thief.NewDirectory()
+
   api := api.New()
+  api.Guilds = directory
+
   api.Serve(hostname)
 }
 
