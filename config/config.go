@@ -19,6 +19,6 @@ func Default() *Config {
 }
 
 func (c *Config) NameRoot() string {
-  return filepath.Join(c.DataRoot, "names")
+  return filepath.Join("config", "names")
 }
 

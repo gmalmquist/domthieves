@@ -1,0 +1,48 @@
+CULTURE: charles
+
+[HONORIFICS 0-1]
+Miss
+Mr.
+Mrs.
+Sir
+Queen
+King
+Baron
+Earl
+Prince
+Princess
+Princex
+Regent
+Friar
+Priestess
+
+[GIVEN 1-2]
+Charles
+Maximus
+Higgins
+Fleur
+Hannah
+Kimberly
+
+[MIDDLE 0-1]
+the Third
+
+[FAMILY 1-2]
+Stevens
+Biblby
+Charleston
+
+[DESCRIPTOR 0-1]
+of Troy
+de Marseille
+
+
+[POSTNOMINAL 0-1]
+separator: ,
+MD
+Esquire
+PhD
+Doctor at Large
+Criminal
+Ghost
+

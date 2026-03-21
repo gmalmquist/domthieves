@@ -2,38 +2,38 @@ package names
 
 import (
   "domthieves/storeutil"
-  "domthieves/jsv"
   "domthieves/config"
+  "domthieves/rutil"
 
+  "bufio"
+  "errors"
+  "fmt"
+  "log"
   "math/rand"
   "os"
+  "regexp"
+  "strconv"
   "strings"
 )
 
 type Culture struct {
   // Name of the culture
-  Name string `json:"culture"`
-  // Miss, Sir, Dr., etc
-  Honorifics *NameGroup `json:"honorific"`
-  // Charles, Mary Anne, Archibald, etc
-  Givens *NameGroup `json:"given"`
-  // This is often the same set as the Givens, and can be dropped entirely in favor of allowing multiple given names
-  Middles *NameGroup `json:"middle"`
-  // Family names. Brown, Stevenson, of Rivendell, daughter of Kevin
-  Surnames *NameGroup `json:"family"`
-  // Esquire, M.D., Thief, Plumber
-  Postnominal *NameGroup `json:"postnominal"`
+  CultureName string `json:"culture"`
+  // Parts of a name
+  NameParts []*NameSet `json:"names"`
 }
 
-type NameGroup struct {
+type NameSet struct {
+  // What part of a name does this set represent
+  Part string `json:"part"`
   // Possible names in this group
   Names []string `json:"names"`
   // Minimum number of names to pull
   Min int `json:"min"`
   // Maximum number of names to pull
   Max int `json:"max"`
-  // Allow repeated names?
-  AllowRepeats bool `json:"repeats"`
+  // Separator
+  Separator string `json:"separator"`
 }
 
 type NameGen struct {
@@ -48,25 +48,147 @@ func New() *NameGen {
 }
 
 func (g *NameGen) Register(c *Culture) {
-  g.Cultures[c.Name] = c
+  g.Cultures[c.CultureName] = c
 }
 
 func (g *NameGen) LoadAll() error {
   for path := range storeutil.IterPaths(
-    config.Conf.NameRoot(), "json",
+    config.Conf.NameRoot(), "culture",
   ) {
-    data, err := os.ReadFile(path)
+    c, err := LoadCulture(path)
     if err != nil {
       return err
     }
-    var c Culture
-    err = jsv.JsonValue(data).Unmarshal(&c)
-    if err != nil {
-      return err
+    if config.Debug {
+      log.Printf("Loaded culture:\n%v", c.Summary())
     }
-    g.Register(&c)
+    g.Register(c)
   }
   return nil
+}
+
+var reNameSetHeader = regexp.MustCompile(`^\[(?<name>\w+)(\s+(?<min>\d+)?([-]+(?<max>\d+)?)?)?\]`)
+var reProperty = regexp.MustCompile(`^(?<name>\w+):\s*(?<value>.*)$`)
+func LoadCulture(path string) (*Culture, error) {
+  f, err := os.Open(path)
+  if err != nil {
+    return nil, err
+  }
+  defer f.Close()
+
+  c := &Culture{
+    NameParts: []*NameSet{},
+  }
+  var currSet *NameSet
+
+  lineno := -1
+  sc := bufio.NewScanner(f)
+  for sc.Scan() {
+    line := strings.TrimSpace(sc.Text())
+    lineno += 1
+
+    if line == "" {
+      continue
+    }
+
+    mkerr := func(msg string, args ...any) error {
+      if len(args) > 0 {
+        msg = fmt.Sprintf(msg, args...)
+      }
+      return errors.New(fmt.Sprintf("%v:%v: %v:\n%v", path, lineno, msg, line))
+    }
+
+    if currSet == nil {
+      m := rutil.RegMatch(reProperty, line)
+      if m != nil {
+        key := strings.ToUpper(m["name"])
+        switch key {
+        case "CULTURE":
+          c.CultureName = m["value"]
+          continue
+        }
+        return nil, mkerr("unknown property name '%v'", key)
+      }
+    }
+
+    if line[0] == '[' {
+      m := rutil.RegMatch(reNameSetHeader, line)
+      if m == nil {
+        return nil, mkerr("invalid header syntax")
+      }
+      name := strings.ToUpper(m["name"])
+      smin := m["min"]
+      smax := m["max"]
+      var min, max int
+
+      if smin != "" {
+        min, err = strconv.Atoi(smin)
+        if err != nil {
+          return nil, mkerr("min name count not an int")
+        }
+      }
+
+      if smax != "" {
+        max, err = strconv.Atoi(smax)
+        if err != nil {
+          return nil, mkerr("max name count not an int")
+        }
+      }
+
+      if smin == "" && smax == "" {
+        min = 1
+        max = 1
+      } else if smax == "" && min > 0 {
+        max = min
+      }
+
+      if min > max {
+        return nil, mkerr("min cannot be greater than max (%v - %v)", min, max)
+      }
+
+      if currSet != nil && len(currSet.Names) > 0 {
+        c.NameParts = append(c.NameParts, currSet)
+      }
+
+      currSet = &NameSet{
+        Part: name,
+        Min: min,
+        Max: max,
+        Names: []string{},
+      }
+
+      continue
+    }
+
+    if currSet == nil {
+      return nil, mkerr("name outside set")
+    }
+
+    if len(currSet.Names) == 0 {
+      // if we have a current set but haven't
+      // yet added any names to it, there are
+      // possibly properties set for it
+      m := rutil.RegMatch(reProperty, line)
+      if m != nil {
+        key := strings.ToUpper(m["name"])
+        val := strings.TrimSpace(m["value"])
+        switch key {
+        case "SEPARATOR":
+          currSet.Separator = val
+          continue
+        }
+        return nil, mkerr("unknown property for name part %v", currSet.Part)
+      }
+    }
+
+    currSet.Names = append(currSet.Names, line)
+  }
+
+  if currSet != nil && len(currSet.Names) > 0 {
+    c.NameParts = append(c.NameParts, currSet)
+  }
+
+  return c, nil
 }
 
 func (g *NameGen) Generate(culture string) string {
@@ -79,14 +201,14 @@ func (g *NameGen) Generate(culture string) string {
 
 func (c *Culture) Generate() string {
   var b strings.Builder
-  for _, group := range c.Groups() {
-    name := group.Pull()
+  for set := range c.Order() {
+    name := set.Pull()
     if name == "" {
       continue
     }
     if b.Len() > 0 {
-      if group == c.Postnominal {
-        b.WriteRune(',')
+      if set.Separator != "" {
+        b.WriteString(set.Separator)
       }
       b.WriteRune(' ')
     }
@@ -95,7 +217,7 @@ func (c *Culture) Generate() string {
   return b.String()
 }
 
-func (group *NameGroup) Empty() bool {
+func (group *NameSet) Empty() bool {
   if group == nil {
     return true
   }
@@ -105,7 +227,7 @@ func (group *NameGroup) Empty() bool {
   return false
 }
 
-func (group *NameGroup) Pull() string {
+func (group *NameSet) Pull() string {
   if group.Empty() {
     return ""
   }
@@ -126,8 +248,8 @@ func (group *NameGroup) Pull() string {
   var b strings.Builder
   for i := 0; i < target; i++ {
     n := group.PullOne()
-    if !group.AllowRepeats && chosen[n] {
-      break
+    if chosen[n] {
+      break // prevent someone being named Charles Charles Charles Brown
     }
     chosen[n] = true
     if i > 0 {
@@ -138,20 +260,35 @@ func (group *NameGroup) Pull() string {
   return b.String()
 }
 
-func (group *NameGroup) PullOne() string {
+func (group *NameSet) PullOne() string {
   if len(group.Names) == 0 {
     return ""
   }
   return group.Names[rand.Intn(len(group.Names))]
 }
 
-func (c *Culture) Groups() []*NameGroup {
-  return []*NameGroup{
-    c.Honorifics,
-    c.Givens,
-    c.Middles,
-    c.Surnames,
-    c.Postnominal,
+func (c *Culture) Order() func(func(*NameSet) bool) {
+  return func(yield func(*NameSet) bool) {
+    for _, p := range c.NameParts {
+      if p.Empty() {
+        continue
+      }
+      if !yield(p) {
+        return
+      }
+    }
   }
+}
+
+func (c *Culture) Summary() string {
+  var b strings.Builder
+  b.WriteString("[")
+  b.WriteString(c.CultureName)
+  b.WriteString("]\n")
+  for s := range c.Order() {
+    b.WriteString(fmt.Sprintf("\n- %v %v-%v: %v names", s.Part, s.Min, s.Max, len(s.Names)))
+  }
+  b.WriteString("\n")
+  return b.String()
 }
 
