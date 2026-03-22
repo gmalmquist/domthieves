@@ -10,6 +10,28 @@ import (
   "strings"
 )
 
+var DangerousTags = map[string]bool{
+  "body": true,
+  "button": true,
+  "datalist": true,
+  "data": true,
+  "fieldset": true,
+  "form": true,
+  "head": true,
+  "html": true,
+  "input": true,
+  "legend": true,
+  "link": true,
+  "meta": true,
+  "optgroup": true,
+  "option": true,
+  "output": true,
+  "script": true,
+  "select": true,
+  "style": true,
+  "textarea": true,
+}
+
 type LootID string
 
 func NewID() LootID {
@@ -82,30 +104,9 @@ func (loot *Loot) Validate() error {
   return nil
 }
 
-var dangerousTags = map[string]bool{
-  "body": true,
-  "button": true,
-  "datalist": true,
-  "data": true,
-  "fieldset": true,
-  "form": true,
-  "head": true,
-  "html": true,
-  "input": true,
-  "legend": true,
-  "link": true,
-  "meta": true,
-  "optgroup": true,
-  "option": true,
-  "output": true,
-  "script": true,
-  "select": true,
-  "style": true,
-  "textarea": true,
-}
 func checkElementNode(node *html.Node) error {
   tag := strings.ToLower(node.Data)
-  if dangerousTags[tag] {
+  if DangerousTags[tag] {
     return errors.New(fmt.Sprintf("400 dangerous tag %v", tag))
   }
   if node.Attr != nil {

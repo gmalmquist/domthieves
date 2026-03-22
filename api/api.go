@@ -2,6 +2,7 @@ package api
 
 import (
   "domthieves/config"
+  "domthieves/loot"
   "domthieves/names"
   "domthieves/netutil"
   "domthieves/storeutil"
@@ -131,6 +132,10 @@ func (api *Api) Setup() {
     nu.ReplyJson(thief)
   })
 
+  mux.Handle("GET /api/illegal-tags", func(nu Nu) {
+    nu.ReplyJson(loot.DangerousTags)
+  })
+
   mux.Handle("GET /api/name", func(nu Nu) {
     w, r := nu.Unwrap()
     q := r.URL.Query()
@@ -167,6 +172,12 @@ func (api *Api) Setup() {
       }
       w.Write([]byte(culture.Generate()))
     }
+  })
+
+  fs := http.FileServer(http.Dir("./www"))
+  mux.Handle("/", func(nu Nu) {
+    w, r := nu.Unwrap()
+    fs.ServeHTTP(w, r)
   })
 
   api.Health = Ready()
