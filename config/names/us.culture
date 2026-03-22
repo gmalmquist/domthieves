@@ -24,6 +24,27 @@ The Extemporaneous
 The Immaculate
 The Opulent
 The Sultry
+The Unenviable
+The Enviable
+The Unknowable
+The Imperceptible
+The Perceivable
+The Thoughtful
+The Pensive
+The Melancholy
+The Delightful
+The Demiurge
+The Immaculate
+The Commensurate
+The Comparable
+The Penniless
+The Lovely
+The Loveless
+The Cruel
+The Kind
+The Malevolent
+The Sleepy
+The Gray Fox
 
 # Ultra Rare
 [HONORIFICS]
@@ -82,7 +103,7 @@ Mr.
 Mrs.
 Mx.
 
-[GIVEN 1-3]
+[GIVEN]
 # https://www.cs.cmu.edu/Groups/AI/areas/nlp/corpora/names/male.txt
 Aamir
 Aaron
@@ -8031,6 +8052,26 @@ Zsa Zsa
 Zulema
 Zuzana
 
+# added by me
+Suverin
+Bobert
+Boberta
+Wren
+Viola
+
+[NICKNAME]
+P: 0.01
+"Bix"
+"Patty"
+"Axel"
+"X-treme"
+"The Razz"
+"The Ball"
+"Maximum Legend"
+
+[MIDDLE 0-2]
+COPY: GIVEN
+
 [FAMILY 0-2]
 # https://www.cs.cmu.edu/Groups/AI/areas/nlp/corpora/names/other/family.txt
 Aalders
@@ -10371,11 +10412,7 @@ Cooksey
 Cooley
 Coombs
 Cooney
-Co-op
 Cooper
-Coord
-Co-ordinator
-Coordinator
 Coors
 Copeland
 Copello
@@ -21379,6 +21416,9 @@ Zybala
 Zylstra
 Zywiel
 
+# added by me
+Kedberiket
+
 [ORDINAL]
 P: 0.05
 Jr.
@@ -21396,11 +21436,17 @@ VII
 VIII
 IX
 X
-
+the Gray
+the White
+the Beige
+the Burgundy
+the Brown
+the Slimy
+the Suave
 
 
 [HOME]
-P: 0.05
+P: 0.0025
 de Marseille
 of Atlanta
 of Australia
@@ -21445,4 +21491,14 @@ Thief
 Witch
 Wizard
 Warlock
+
+# Very Rare
+[POSTNOMINAL]
+SEPARATOR: ,
+P: 0.005
+
+Witch of Time
+Witch of The Worlds Heart
+Out of Time and Space
+
 

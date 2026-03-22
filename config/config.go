@@ -9,12 +9,13 @@ var Conf = Default()
 
 type Config struct {
   DataRoot string
-
+  DefaultCulture string
 }
 
 func Default() *Config {
   return &Config{
     DataRoot: "data",
+    DefaultCulture: "en_us",
   }
 }
 

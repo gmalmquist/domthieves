@@ -50,7 +50,7 @@ func New() *NameGen {
 }
 
 func (g *NameGen) Register(c *Culture) {
-  g.Cultures[c.CultureName] = c
+  g.Cultures[normalizeName(c.CultureName)] = c
 }
 
 func (g *NameGen) LoadAll() error {
@@ -60,9 +60,6 @@ func (g *NameGen) LoadAll() error {
     c, err := LoadCulture(path)
     if err != nil {
       return err
-    }
-    if config.Debug {
-      log.Printf("Loaded culture:\n%v", c.Summary())
     }
     g.Register(c)
   }
@@ -192,7 +189,14 @@ func LoadCulture(path string) (*Culture, error) {
           }
           currSet.RNG = rng 
           continue
-
+        case "COPY":
+          for _, set := range c.NameParts {
+            if set.Part != val {
+              continue
+            }
+            currSet.Names = append(currSet.Names, set.Names...)
+          }
+          continue
         }
         return nil, mkerr("unknown property for name part %v", currSet.Part)
       }
@@ -206,6 +210,11 @@ func LoadCulture(path string) (*Culture, error) {
   }
 
   return c, nil
+}
+
+func (g *NameGen) Culture(name string) (*Culture, bool) {
+  c, ok := g.Cultures[normalizeName(name)]
+  return c, ok
 }
 
 func (g *NameGen) Generate(culture string) string {
@@ -356,5 +365,9 @@ func (c *Culture) Summary() string {
   }
   b.WriteString("\n")
   return b.String()
+}
+
+func normalizeName(name string) string {
+  return strings.ToUpper(strings.ReplaceAll(name, "-", "_"))
 }
 

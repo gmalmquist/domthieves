@@ -1,20 +1,23 @@
 package api
 
 import (
-  "net/http"
-  "os"
-  "path/filepath"
-  "strings"
-  "fmt"
-
   "domthieves/config"
+  "domthieves/names"
   "domthieves/netutil"
   "domthieves/storeutil"
   "domthieves/thief"
-  "domthieves/names"
+
+  "fmt"
+  "net/http"
+  "os"
+  "path/filepath"
+  "strconv"
+  "strings"
 )
 
 const Version string = "0.0.1"
+
+var MaxGenBatchSize int = 100
 
 type Api struct {
   Mux *netutil.Mux
@@ -112,6 +115,44 @@ func (api *Api) Setup() {
     thief := guild.Recruit(offer)
 
     nu.ReplyJson(thief)
+  })
+
+  mux.Handle("GET /api/name", func(nu Nu) {
+    w, r := nu.Unwrap()
+    q := r.URL.Query()
+
+    c := q.Get("culture")
+    if c == "" {
+      c = q.Get("lang")
+    }
+    if c == "" {
+      c = config.Conf.DefaultCulture
+    }
+
+    culture, ok := api.NameGen.Culture(c)
+    if !ok {
+      nu.ReplyErr(404, "no such culture '%v'", c)
+      return
+    }
+    
+    scount := q.Get("count")
+    count, err := strconv.Atoi(scount)
+    if err != nil {
+      count = 1
+    }
+    if count > MaxGenBatchSize {
+      count = MaxGenBatchSize
+    }
+
+    w.Header().Add("Content-Type", "text/plain; charset=utf-8")
+
+    newline := []byte("\n")
+    for i := 0; i < count; i++ {
+      if i > 0 {
+        w.Write(newline)
+      }
+      w.Write([]byte(culture.Generate()))
+    }
   })
 
   api.Health = Ready()
