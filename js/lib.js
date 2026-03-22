@@ -1,6 +1,7 @@
 var DT = {};
 
 const ALREADY_STOLEN = 'already_stolen';
+const ALREADY_ASSESSED = 'already_stolen';
 const USELESS = 'useless';
 const ILLEGAL_TAG = 'illegal_tag';
 const HIDDEN = 'hidden';
@@ -16,7 +17,7 @@ DT.Fetch = async (path, args) => {
   return await fetch(`${DT.ApiRoot}${path}`, args);
 };
 
-DT.AssessAllLoot = () => {
+DT.FindLoot = () => {
   DT.AssessLoot(document.querySelectorAll('[data-loot]'));
   DT.AssessLoot(document.querySelectorAll('[data-loot-use]'));
   DT.AssessLoot(document.querySelectorAll('[data-loot-uses]'));
@@ -26,10 +27,10 @@ DT.AssessLoot = (loot) => {
   for (const dom of loot) {
     const item = DT.AssessLootItem(dom);
     if (typeof item === 'string') {
-      dom.dataset.lootAssessment = item;
       continue;
     }
     DT.inventory.push(item);
+    item.dom.dataset.lootAssessed = "true";
   }
 };
 
@@ -43,12 +44,16 @@ DT.AssessLootItem = dom => {
     return HIDDEN;
   }
 
-  if (isSome(dom.dataset.lootAssessment)) {
-    return dom.dataset.lootAssessment;
+  if (isSome(dom.dataset.lootAssessed)) {
+    return ALREADY_ASSESSED;
   }
 
   const tagName = dom.tagName.toLocaleLowerCase();
   const uses = new Set([tagName]);
+
+  if (isSome(dom.dataset.loot)) {
+    uses.add(dom.dataset.loot);
+  }
 
   if (isSome(dom.dataset.lootUse)) {
     uses.add(dom.dataset.lootUse);
@@ -207,7 +212,11 @@ DT.BakeStyle = (dom, copy) => {
 };
 
 DT.LocateUse = use => {
+  DT.FindLoot();
   for (const item of DT.inventory) {
+    if (item.dom.dataset.lootStolen) {
+      continue;
+    }
     if (item.uses.has(use)) {
       return item;
     }
@@ -290,6 +299,8 @@ DT.Steal = (item) => {
   item.dom.style.userSelect = 'none';
   item.dom.style.pointerEvents = 'none';
 
+  item.dom.dataset.lootStolen = 'true';
+
   return copy;
 };
 
@@ -355,18 +366,13 @@ DT.Recruit = async () => {
 
   thief.showNametag = () => {
     const task = thief.newTask('showing nametag', (_, task) => {
-      if (!task.showing) {
-        if (thief._nametagAction === 'show') {
+      if (task.firstFrame) {
+        if (parseFloat(nametag.style.opacity) > 0.0) {
           return false;
         }
-        if (isEmpty(thief._nametagAction)) {
-          task.showing = true;
-          thief._nametagAction = 'show';
-          nametag.style.opacity = '0.8';
-          task.frame = 0;
-          task.started = true;
-        }
-        return true;
+        if (thief._nametagAction === 'hide') { return false; }
+        nametag.style.opacity = '0.8';
+        thief._nametagAction = 'show';
       }
       if (task.duration <= 0.5) {
         return true; // let css transition occur
@@ -379,18 +385,13 @@ DT.Recruit = async () => {
 
   thief.hideNametag = (immediate) => {
     const task = thief.newTask('hiding nametag', (_, task) => {
-      if (!task.hideing) {
-        if (thief._nametagAction === 'hide') {
+      if (task.firstFrame) {
+        if (parseFloat(nametag.style.opacity) === 0.0) {
           return false;
         }
-        if (isEmpty(thief._nametagAction)) {
-          task.hideing = true;
-          thief._nametagAction = 'hide';
-          nametag.style.opacity = '0.0';
-          task.frame = 0;
-          return false;
-        }
-        return true;
+        if (thief._nametagAction === 'show') { return false; }
+        nametag.style.opacity = '0';
+        thief._nametagAction = 'hide';
       }
       if (task.duration <= 0.5) {
         return true; // let css transition occur
@@ -611,6 +612,10 @@ DT.Recruit = async () => {
 };
 
 DT.Offer = async (item) => {
+  if (isNone(item)) {
+    console.error("offered nil item", item);
+    return;
+  }
   for (const thief of DT.thieves) {
     thief.take(item);
     return;
@@ -624,8 +629,6 @@ DT.Initialize = async () => {
   DT.guild = 'global';
   DT.inventory = [];
   DT.thieves = [];
-
-  DT.AssessAllLoot();
 };
 
 setTimeout(DT.Initialize, 500);
