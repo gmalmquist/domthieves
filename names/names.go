@@ -34,6 +34,8 @@ type NameSet struct {
   Max int `json:"max"`
   // Separator
   Separator string `json:"separator"`
+  // Probability of inclusion, 0-1, default 1.0.
+  RNG float64 `json:"rng"`
 }
 
 type NameGen struct {
@@ -87,7 +89,7 @@ func LoadCulture(path string) (*Culture, error) {
     line := strings.TrimSpace(sc.Text())
     lineno += 1
 
-    if line == "" {
+    if line == "" || line[0] == '#' {
       continue
     }
 
@@ -155,6 +157,7 @@ func LoadCulture(path string) (*Culture, error) {
         Min: min,
         Max: max,
         Names: []string{},
+        RNG: 1.0,
       }
 
       continue
@@ -176,6 +179,20 @@ func LoadCulture(path string) (*Culture, error) {
         case "SEPARATOR":
           currSet.Separator = val
           continue
+        case "P": fallthrough
+        case "PROBABILITY": fallthrough
+        case "CHANCE": fallthrough
+        case "RNG":
+          rng, err := strconv.ParseFloat(val, 64)
+          if err != nil {
+            return nil, mkerr("illegal floating-point value", err)
+          }
+          if rng < 0 || rng > 1 {
+            return nil, mkerr("rng must be between 0 and 1")
+          }
+          currSet.RNG = rng 
+          continue
+
         }
         return nil, mkerr("unknown property for name part %v", currSet.Part)
       }
@@ -201,7 +218,7 @@ func (g *NameGen) Generate(culture string) string {
 
 func (c *Culture) Generate() string {
   var b strings.Builder
-  for set := range c.Order() {
+  for set := range c.PickNameSets() {
     name := set.Pull()
     if name == "" {
       continue
@@ -235,9 +252,6 @@ func (group *NameSet) Pull() string {
   if group.Max > group.Min {
     target += rand.Intn(1 + group.Max - group.Min)
   }
-  if group.Min == 0 && group.Max == 0 {
-    target = 1
-  }
   if target == 0 {
     return ""
   }
@@ -248,11 +262,14 @@ func (group *NameSet) Pull() string {
   var b strings.Builder
   for i := 0; i < target; i++ {
     n := group.PullOne()
+    if n == "" {
+      continue
+    }
     if chosen[n] {
       break // prevent someone being named Charles Charles Charles Brown
     }
     chosen[n] = true
-    if i > 0 {
+    if b.Len() > 0 {
       b.WriteRune(' ')
     }
     b.WriteString(n)
@@ -267,9 +284,58 @@ func (group *NameSet) PullOne() string {
   return group.Names[rand.Intn(len(group.Names))]
 }
 
-func (c *Culture) Order() func(func(*NameSet) bool) {
+func (c *Culture) PickNameSets() func(func(*NameSet) bool) {
   return func(yield func(*NameSet) bool) {
+    // if multiple name parts have the same Part name, we pick ONE of them to include at random.
+
+    // map of set name to probability distributions of inclusion
+    dists := map[string][]float64{}
+    for _, set := range c.NameParts {
+      dist, ok := dists[set.Part]
+      if ok {
+        dists[set.Part] = append(dist, set.RNG)
+      } else {
+        dists[set.Part] = []float64{ set.RNG }
+      }
+    }
+
+    // map of name part to nth occurance
+    chosen := map[string]int{}
+
+    for part, dist := range dists {
+      // normalize probabilities if their sum is greater than 1.0
+      var sum float64
+      for _, p := range dist {
+        sum += p
+      }
+      if sum > 1.0 {
+        log.Printf("%v: normalize p sum %v", part, sum)
+        for i, p := range dist {
+          dist[i] = p / sum
+        }
+      }
+
+      chosen[part] = -1
+
+      r := rand.Float64()
+      for i, p := range dist {
+        if p >= r {
+          chosen[part] = i
+          break
+        }
+        r -= p
+      }
+    }
+
+    idx := map[string]int{}
     for _, p := range c.NameParts {
+      i := idx[p.Part]
+      idx[p.Part] = i + 1
+
+      if chosen[p.Part] != i {
+        continue
+      }
+
       if p.Empty() {
         continue
       }
@@ -284,9 +350,9 @@ func (c *Culture) Summary() string {
   var b strings.Builder
   b.WriteString("[")
   b.WriteString(c.CultureName)
-  b.WriteString("]\n")
-  for s := range c.Order() {
-    b.WriteString(fmt.Sprintf("\n- %v %v-%v: %v names", s.Part, s.Min, s.Max, len(s.Names)))
+  b.WriteString("]")
+  for i, s := range c.NameParts {
+    b.WriteString(fmt.Sprintf("\n%v. %v %v-%v, p=%v: %v names", i+1, s.Part, s.Min, s.Max, s.RNG, len(s.Names)))
   }
   b.WriteString("\n")
   return b.String()

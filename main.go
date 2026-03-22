@@ -18,8 +18,9 @@ func main() {
   if err := namegen.LoadAll(); err != nil {
     log.Fatal(err)
   }
-  fmt.Printf("rname: %v\n",
-    namegen.Generate("charles"))
+  for i := 1; i <= 20; i++ {
+    fmt.Printf("charles %v: %v\n", i, namegen.Generate("en_us"))
+  }
 
   directory := thief.NewDirectory()
 
