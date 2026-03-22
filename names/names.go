@@ -16,6 +16,10 @@ import (
   "strings"
 )
 
+type Generator interface {
+  Generate() string
+}
+
 type Culture struct {
   // Name of the culture
   CultureName string `json:"culture"`
@@ -218,7 +222,10 @@ func (g *NameGen) Culture(name string) (*Culture, bool) {
 }
 
 func (g *NameGen) Generate(culture string) string {
-  c, ok := g.Cultures[culture]
+  if culture == "" {
+    culture = config.Conf.DefaultCulture
+  }
+  c, ok := g.Culture(culture)
   if !ok {
     return "[no culture: " + culture + "]"
   }

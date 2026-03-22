@@ -19,7 +19,7 @@ func main() {
     log.Fatal(err)
   }
 
-  directory := thief.NewDirectory()
+  directory := thief.NewDirectory(namegen)
 
   api := api.New()
   api.NameGen = namegen

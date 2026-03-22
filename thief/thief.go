@@ -18,7 +18,11 @@ type Thief struct {
   // Website (hostname) the thief is working for
   Employer string `json:"employer"`
   // Human readable name of the thief's job
-  JobDescription string `json:"job_description"`
+  JobDescription string `json:"job"`
+  // When the job was assigned in RFC3339
+  RecruitedAt string `json:"recruited_at"`
+  // When the thief's employer last issued a query
+  LastTaskAt string `json:"last_task_at"`
   // URL of spritesheet
   Spritesheet string `json:"spritesheet"`
 }
@@ -27,7 +31,7 @@ func NewID() ThiefID {
   return ThiefID(uuid.NewString())
 }
 
-type RecruitOffer struct {
+type JobOffer struct {
   Origin string `json:"origin"`
   Spritesheet string `json:"spritesheet"`
   JobDescription string `json:"job_description"`

@@ -89,6 +89,20 @@ func (api *Api) Setup() {
     nu.ReplyJson(thief)
   })
 
+  mux.Handle("GET /api/guild/{gid}/active", func(nu Nu) {
+    _, r := nu.Unwrap()
+    gid := thief.GuildID(r.PathValue("gid"))
+    
+    guild, ok := api.Guilds.Guild(gid)
+    if !ok {
+      nu.ReplyErr(404, "No guild is chartered as '%v'", gid)
+      return
+    }
+
+    active := guild.ListActive()
+    nu.ReplyJson(active)
+  })
+
   mux.Handle("GET /api/guild/{gid}/recruit", func(nu Nu) {
     _, r := nu.Unwrap()
     gid := thief.GuildID(r.PathValue("gid"))
@@ -106,7 +120,7 @@ func (api *Api) Setup() {
 
     q := r.URL.Query()
 
-    offer := thief.RecruitOffer{
+    offer := thief.JobOffer{
       Origin: origin,
       JobDescription: q.Get("job"),
       Spritesheet: q.Get("spritesheet"),

@@ -1,10 +1,13 @@
 package thief
 
 import (
+  "domthieves/names"
+
   "github.com/gammazero/deque"
   "github.com/google/uuid"
 
   "hash/maphash"
+  "time"
 )
 
 import (
@@ -17,20 +20,23 @@ type GuildID string
 
 // Basically a webring that has shared thieves
 type Guild struct {
-  ID GuildID
-  Name string
-  Websites map[string]bool
-  Spritesheets []string
-  thieves map[ThiefID]*Thief
-  idle deque.Deque[*Thief]
-  lock *sync.RWMutex
+  ID GuildID `json:"id"`
+  Name string `json:"name"`
+  Websites map[string]bool `json:"websites"`
+  Spritesheets []string `json:"spritesheets"`
+  Culture string `json:"culture"`
+  namegen *names.NameGen `json:"-"`
+  thieves map[ThiefID]*Thief `json:"thieves"`
+  idle deque.Deque[*Thief] `json:"-"`
+  lock *sync.RWMutex `json:"-"`
 }
 
-func NewGuild() *Guild {
+func NewGuild(namegen *names.NameGen) *Guild {
   return &Guild{
     ID: NewGuildID(),
     Websites: map[string]bool{},
     Spritesheets: []string{},
+    namegen: namegen,
     thieves: map[ThiefID]*Thief{},
     lock: &sync.RWMutex{},
   }
@@ -47,6 +53,18 @@ func (g *Guild) IsMember(website string) bool {
   return g.Websites[website]
 }
 
+func (g *Guild) ListActive() ([]*Thief) {
+  arr := []*Thief{}
+  g.lock.RLock()
+  defer g.lock.RUnlock()
+  for _, thief := range g.thieves {
+    if thief.Employer != "" {
+      arr = append(arr, thief)
+    }
+  }
+  return arr
+}
+
 func (g *Guild) Thief(tid ThiefID) (*Thief, bool) {
   g.lock.RLock()
   defer g.lock.RUnlock()
@@ -54,24 +72,28 @@ func (g *Guild) Thief(tid ThiefID) (*Thief, bool) {
   return thief, ok
 }
 
-func (g *Guild) Recruit(offer RecruitOffer) *Thief {
+func (g *Guild) Recruit(offer JobOffer) *Thief {
   g.lock.Lock()
   defer g.lock.Unlock()
+
+  var thief *Thief
+
   if g.idle.Len() > 0 {
-    thief := g.idle.PopFront()
+    thief = g.idle.PopFront()
     thief.Employer = offer.Origin
     thief.JobDescription = offer.JobDescription
-    return thief
+  } else {
+    thief = &Thief{
+      ID: NewID(),
+      GuildID: g.ID,
+      Name: g.namegen.Generate(g.Culture),
+      Origin: offer.Origin,
+      Spritesheet: offer.Spritesheet,
+    }
   }
-  thief := &Thief{
-    ID: NewID(),
-    GuildID: g.ID,
-    Name: "Charles",
-    Origin: offer.Origin,
-    Employer: offer.Origin,
-    Spritesheet: offer.Spritesheet,
-    JobDescription: offer.JobDescription,
-  }
+
+  thief.Employer = offer.Origin
+  thief.JobDescription = offer.JobDescription
 
   if thief.Spritesheet == "" {
     if g.Spritesheets != nil && len(g.Spritesheets) > 0 {
@@ -81,6 +103,10 @@ func (g *Guild) Recruit(offer RecruitOffer) *Thief {
       thief.Spritesheet = g.Spritesheets[idx]
     }
   }
+
+  now := time.Now()
+  thief.RecruitedAt = now.Format(time.RFC3339)
+  thief.LastTaskAt = now.Format(time.RFC3339)
 
   g.thieves[thief.ID] = thief
   return thief
@@ -93,19 +119,25 @@ func (g *Guild) Return(tid ThiefID) {
   if !ok {
     return
   }
+  thief.Employer = ""
+  thief.JobDescription = ""
+  thief.RecruitedAt = ""
+  thief.LastTaskAt = ""
   g.idle.PushBack(thief)
 }
 
 type Directory struct {
+  namegen *names.NameGen
   guilds map[GuildID]*Guild
   lock *sync.RWMutex
 }
 
-func NewDirectory() *Directory {
-  global := NewGuild()
+func NewDirectory(namegen *names.NameGen) *Directory {
+  global := NewGuild(namegen)
   global.ID = GlobalGuildID
   global.Name = "Global"
   return &Directory{
+    namegen: namegen,
     guilds: map[GuildID]*Guild{
       GlobalGuildID: global,
     },
