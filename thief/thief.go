@@ -1,6 +1,8 @@
 package thief
 
 import (
+  "domthieves/loot"
+
   "github.com/google/uuid"
 )
 
@@ -25,6 +27,8 @@ type Thief struct {
   LastTaskAt string `json:"last_task_at"`
   // URL of spritesheet
   Spritesheet string `json:"spritesheet"`
+  // Stolen DOM
+  LootSack loot.Sack `json:"lootsack"`
 }
 
 func NewID() ThiefID {
