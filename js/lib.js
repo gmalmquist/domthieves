@@ -3,6 +3,7 @@ var DT = {};
 const ALREADY_STOLEN = 'already_stolen';
 const USELESS = 'useless';
 const ILLEGAL_TAG = 'illegal_tag';
+const HIDDEN = 'hidden';
 
 const A_APPEAR = 'appear';
 
@@ -35,6 +36,11 @@ DT.AssessLoot = (loot) => {
 DT.AssessLootItem = dom => {
   if (!!dom.dataset.lootStolen) {
     return ALREADY_STOLEN;
+  }
+
+  const style = window.getComputedStyle(dom);
+  if (style.display === 'none' || style.opacity === 0.0) {
+    return HIDDEN;
   }
 
   if (isSome(dom.dataset.lootAssessment)) {
@@ -208,26 +214,81 @@ DT.LocateUse = use => {
   }
 };
 
-DT.Steal = (item) => {
+DT.PhantomClone = item => {
+  const place = Geom.getDocumentBoundingRect(item.dom);
+
   const wrap = document.createElement('div');
   wrap.innerHTML = item.item.dom;
   const copy = wrap.children[0];
 
+  copy.dataset.lootPhantom = "true";
+
   copy.style.position = 'absolute';
+  copy.style.transitionProperty = '';
+  copy.style.left = `${place.left}px`;
+  copy.style.top = `${place.top}px`;
+  copy.style.margin = '0px';
+
   if (copy.style.display === 'inline') {
     copy.style.display = 'inline-block';
   }
 
-  const place = item.dom.getBoundingClientRect();
-  copy.style.left = `${place.left}px`;
-  copy.style.top = `${place.top}px`;
-  copy.style.width = `${place.width}px`;
-  copy.style.height = `${place.height}px`;
+  if (copy.innerHTML.trim() !== "") {
+    // if this is a container, we need to make sure we use the min-contents
+    // bounding rect.
+    switch (item.dom.style.display) {
+      case 'flex':
+        copy.style.display = 'inline-flex';
+        break;
+      case 'grid':
+        copy.style.display = 'inline-grid';
+        break;
+      case 'table':
+        copy.style.display = 'inline-table';
+        break;
+      default:
+        copy.style.display = 'inline-block';
+        break;
+    }
+
+    // set the max values instead of the direct values, in case the element's inline size is
+    // smaller
+    copy.style.width = 'unset';
+    copy.style.height = 'unset';
+    copy.style.maxWidth = `${place.width}px`;
+    copy.style.maxHeight = `${place.height}px`;
+
+    copy.style.opacity = '0';
+    document.body.appendChild(copy);
+    const rect = Geom.getDocumentBoundingRect(copy);
+    if (rect.width === 0) {
+      copy.style.width = place.width;
+    } else {
+      copy.style.width = rect.width;
+    }
+    if (rect.height === 0) {
+      copy.style.height = place.height;
+    } else {
+      copy.style.height = rect.height;
+    }
+    copy.remove();
+    copy.style.opacity = item.dom.style.opacity;
+  }
+  return copy;
+};
+
+DT.Steal = (item) => {
+  const copy = DT.PhantomClone(item);
 
   copy.setAttribute('title', `${item.item.name} is being stolen`);
 
   document.body.appendChild(copy);
-  item.dom.style.display = 'none';
+
+  // we turn down the opacity, but do not set display to none, because we
+  // want to preserve the page layout.
+  item.dom.style.opacity = 0;
+  item.dom.style.userSelect = 'none';
+  item.dom.style.pointerEvents = 'none';
 
   return copy;
 };
@@ -247,109 +308,204 @@ DT.Recruit = async () => {
 
   const node = document.createElement('div');
   node.dataset.thief = meta.id;
+  node.dataset.thiefName = meta.name;
 
-  node.classList.add('dt-thief');
-  node.style.display = 'block';
+  node.style.display = 'flex';
+  node.style.flexDirection = 'column';
+  node.style.alignItems = 'center';
+  node.style.justifyContent = 'center';
+  node.style.textAlign = 'center';
   node.style.position = 'absolute';
   node.style.userSelect = 'none';
-  node.style.width = `${size}px`;
-  node.style.height = `${size}px`;
+
+  const spriteblock = document.createElement('div');
+  spriteblock.style.display = 'block';
+  spriteblock.style.backgroundColor = 'rgba(0,0,0,0.25)';
+  spriteblock.style.position = 'relative';
+  spriteblock.style.overflow = 'hidden';
+  spriteblock.style.width = `${size}px`;
+  spriteblock.style.height = `${size}px`;
+  spriteblock.style.margin = '4px';
+
+  const nametag = document.createElement('div');
+  nametag.style.display = 'block';
+  nametag.style.fontFamily = 'monospace';
+  nametag.style.fontSize = '0.8rem';
+  nametag.style.color = 'white';
+  nametag.style.backgroundImage = `linear-gradient(
+    to bottom, #666666, #222222
+  )`;
+  nametag.style.padding = '1px';
+  nametag.style.border = '1px solid #222222';
+  nametag.style.borderRadius = '4px';
+  nametag.style.overflow = 'hidden';
+  nametag.style.pointerEvents = 'none';
+  nametag.style.userSelect = 'none';
+  nametag.style.opacity = '0.8';
+  nametag.style.transitionProperty = 'opacity';
+  nametag.style.transitionDuration = '0.5s';
+  nametag.innerHTML = thief.meta.name;
+
+  node.appendChild(nametag);
+  node.appendChild(spriteblock);
 
   thief.node = node;
+  thief._nametagAction = '';
+  thief.taskQueue = [];
+
+  thief.showNametag = () => {
+    const task = thief.newTask('showing nametag', (_, task) => {
+      if (!task.showing) {
+        if (thief._nametagAction === 'show') {
+          return false;
+        }
+        if (isEmpty(thief._nametagAction)) {
+          task.showing = true;
+          thief._nametagAction = 'show';
+          nametag.style.opacity = '0.8';
+          task.frame = 0;
+          task.started = true;
+        }
+        return true;
+      }
+      if (task.duration <= 0.5) {
+        return true; // let css transition occur
+      }
+      thief._nametagAction = '';
+      return false;
+    });
+    return task;
+  };
+
+  thief.hideNametag = (immediate) => {
+    const task = thief.newTask('hiding nametag', (_, task) => {
+      if (!task.hideing) {
+        if (thief._nametagAction === 'hide') {
+          return false;
+        }
+        if (isEmpty(thief._nametagAction)) {
+          task.hideing = true;
+          thief._nametagAction = 'hide';
+          nametag.style.opacity = '0.0';
+          task.frame = 0;
+          return false;
+        }
+        return true;
+      }
+      if (task.duration <= 0.5) {
+        return true; // let css transition occur
+      }
+      thief._nametagAction = '';
+      return false;
+    });
+    return task;
+  };
 
   thief.setStatus = (text) => {
+    const last = thief.node.getAttribute('title');
     if (text === '') {
       thief.node.setAttribute('title', thief.meta.name);
-      return;
+    } else {
+      thief.node.setAttribute('title', `${thief.meta.name} is ${text}`);
     }
-    thief.node.setAttribute('title', `${thief.meta.name} is ${text}`);
+  };
+
+  thief.flashNametag = (duration) => {
+    thief.asyncTask(thief.showNametag());
+    setTimeout(() => thief.asyncTask(thief.hideNametag()), isSome(duration) ? Math.floor(1000 * duration) : 2500);
   };
 
   thief.setStatus('');
 
-  const newTask = (name, action) => {
+  thief.newTask = (name, action) => {
     const task = {
       name,
-      active: false,
       action,
-      queue: [],
-      _int: -1,
+      duration: 0,
+      frame: 0,
+      state: 'ready',
     };
 
     task.start = () => {
-      if (task.active) { return; }
-      task.active = true;
+      if (task.state !== 'ready') {
+        return false;
+      }
+      task.state = 'running';
       thief.setStatus(task.name);
-      task._int = setInterval(() => {
-        if (!task.action(0.02)) {
-          task.finish();
-        }
-      }, 20);
+      return true;
     };
 
     task.cancel = () => {
-      if (!task.active) {
-        return;
+      if (task.state !== 'ready' && task.state !== 'running') {
+        return false;
       }
-      clearInterval(task._int);
-      task.active = false;
-      task.queue = [];
+      task.state = 'cancelled';
       thief.setStatus('idle');
-      task.name = 'idle';
       task.action = () => {};
+      return true;
     };
 
     task.finish = () => {
-      if (!task.active) {
-        return;
+      if (!task.cancel()) {
+        return false;
       }
-      const queue = task.queue;
-      task.cancel();
-      if (queue.length === 0) {
-        return;
-      }
-      const [next, ...then] = queue;
-      then.forEach(x => next.queue.push(x));
-      thief.task = next;
-      next.start();
+      task.state = 'finished';
+      return true;
     };
 
     return task;
   };
 
-  const idle = () => newTask('idle', () => {
+  const idle = () => thief.newTask('idle', () => {
     return false;
   });
 
   thief.task = idle();
 
   thief.addTask = task => {
-    if (!thief.task.active) {
-      console.log('no active task, overwriting', thief.task.name);
-      thief.task = task;
-      thief.task.start();
-      return;
-    }
-    thief.task.queue.push(task);
+    thief.taskQueue.push(task);
   };
 
-  thief.bounds = () => thief.node.getBoundingClientRect();
+  thief.asyncTask = task => {
+    const dt = 0.02;
+    task.frame = 0;
+    task._int = setInterval(() => {
+      task.frame++;
+      task.duration = task.frame * dt;
+      task.firstFrame = task.frame === 1;
+      if (!task.action(dt, task)) {
+        clearInterval(task._int);
+      }
+    }, 20);
+  };
+
+  const centerOffset = () => {
+    const p = node.getBoundingClientRect();
+    const s = spriteblock.getBoundingClientRect();
+
+    let cx = s.left/2 + s.right/2;
+    let cy = s.top/2 + s.bottom/2;
+
+    return { x: cx - p.x, y: cy - p.y };
+  };
+
+  thief.bounds = () => Geom.getDocumentBoundingRect(spriteblock);
 
   thief.moveTo = (x, y) => {
-    const bounds = thief.bounds();
-    thief.node.style.left = `${x - bounds.width/2}px`;
-    thief.node.style.top = `${y - bounds.height/2}px`;
+    const offset = centerOffset();
+    node.style.left = `${x - offset.x}px`;
+    node.style.top = `${y - offset.y}px`;
   };
 
   thief.moveBy = (dx, dy) => {
-    const bounds = thief.bounds();
-    thief.node.style.left = `${bounds.left + dx}px`;
-    thief.node.style.top = `${bounds.top + dy}px`;
+    const bounds = Geom.getDocumentBoundingRect(node);
+    node.style.left = `${bounds.left + dx}px`;
+    node.style.top = `${bounds.top + dy}px`;
   };
 
   thief.moveToward = (el, delta) => {
-    const src = thief.node.getBoundingClientRect();
-    const dst = el.getBoundingClientRect();
+    const src = Geom.getDocumentBoundingRect(spriteblock);
+    const dst = Geom.getDocumentBoundingRect(el);
     let dx = 0;
     let dy = 0;
     if (dst.right < src.left - reach) {
@@ -372,9 +528,13 @@ DT.Recruit = async () => {
     return true;
   };
 
-  thief.walkTo = el => {
-    const task = newTask('walk', (dt) => {
+  thief.walkTo = item => {
+    const el = DT.PhantomClone(item);
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+    const task = thief.newTask(`walking to ${item.item.name}`, (dt) => {
       if (!thief.moveToward(el, dt * thief.speed)) {
+        el.remove();
         return false;
       }
       return true;
@@ -382,7 +542,68 @@ DT.Recruit = async () => {
     thief.addTask(task);
   };
 
+  thief.take = item => {
+    thief.flashNametag();
+    thief.walkTo(item);
+    thief.addTask(thief.hideNametag());
+    thief.addTask(thief.newTask('taking', (dt) => {
+      const el = DT.Steal(item);
+      el.style.transitionProperty = 'transform';
+      el.style.transitionDuration = '0.5s';
+      el.style.transformOrigin = "center";
+      
+      const rect = Geom.getDocumentBoundingRect(el);
+      const elcx = rect.left/2 + rect.right/2;
+      const elcy = rect.top/2 + rect.bottom/2;
+
+      const thiefr = Geom.getDocumentBoundingRect(spriteblock);
+      const handx = thiefr.left/2 + thiefr.right/2;
+      const handy = thiefr.top/2 + thiefr.bottom/2;
+      
+      const dx = handx - elcx;
+      const dy = handy - elcy;
+
+      el.style.transform = `translate(${dx}px, ${dy}px) rotate(0deg) scale(1.0) translate(${-dx}px, ${dy}px)`;
+      setTimeout(() => {
+        el.style.transform = `translate(${dx}px, ${dy}px) rotate(135deg) scale(0.01) translate(${-dx}px, ${dy}px)`;
+        setTimeout(() => {
+          el.style.display = 'none';
+          el.remove();
+          // TODO: send to server! we got it!
+        }, 500);
+      }, 10);
+    }));
+    thief.addTask(thief.showNametag());
+  };
+
+  const delay = 20;
+  const dt = (delay / 1000.0);
+  thief.taskLoop = setInterval(() => {
+    const task = thief.task;
+    if (!isSome(task) || task.state !== 'running') {
+      const queue = thief.taskQueue;
+      if (queue.length > 0) {
+        const [ next ] = queue.splice(0, 1);
+        thief.task = next;
+        console.log('start', thief.task.name);
+        next.start();
+      }
+      return;
+    }
+    if (isNone(task.frame)) {
+      task.frame = 0;
+    }
+    task.frame++;
+    task.firstFrame = task.frame === 1;
+    task.duration = task.frame * dt;
+    
+    if (!task.action(dt, task)) {
+      task.finish();
+    }
+  }, delay);
+
   thief.moveTo(window.innerWidth/2, window.innerHeight/2);
+  thief.asyncTask(thief.showNametag());
 
   document.body.appendChild(thief.node);
   DT.thieves.push(thief);
@@ -391,11 +612,11 @@ DT.Recruit = async () => {
 
 DT.Offer = async (item) => {
   for (const thief of DT.thieves) {
-    thief.walkTo(item.dom);
+    thief.take(item);
     return;
   }
   const thief = await DT.Recruit();
-  thief.walkTo(item.dom);
+  thief.take(item);
 };
 
 DT.Initialize = async () => {
