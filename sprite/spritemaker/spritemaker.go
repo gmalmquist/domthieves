@@ -16,6 +16,8 @@ import (
   "os"
   "path/filepath"
   "regexp"
+  "slices"
+  "sort"
   "strconv"
   "strings"
 )
@@ -138,24 +140,30 @@ func (mkr *SpriteMaker) Write(w io.Writer) error {
     Min: image.Pt(0, 0),
     Max: image.Pt(0, 0),
   }
-  gifs := []*gif.GIF{}
-  sprites := []*sprite.Sprite{}
-  for _, path := range paths {
+
+  gifs := make([]*gif.GIF, len(paths))
+  sprites := make([]*sprite.Sprite, len(paths))
+  spriteWidths := make([]int, len(paths))
+  for i, path := range paths {
     img, err := loadGIF(path)
     if err != nil {
       return fmt.Errorf("Couldn't load %v: %v", path, err)
     }
+    gifs[i] = img
+    spriteWidths[i] = img.Config.Width * len(img.Image)
+    if spriteWidths[i] > sheetsize.Max.X {
+      sheetsize.Max.X = spriteWidths[i]
+    }
 
     s := &sprite.Sprite{
       Name: filepath.Base(path),
-      FirstFrameX: 0,
-      FirstFrameY: sheetsize.Max.Y,
       FrameWidth: img.Config.Width,
       FrameHeight: img.Config.Height,
       FrameCount: len(img.Image),
       LoopCount: img.LoopCount,
       DelayMilli: make([]int, len(img.Image)),
     }
+    sprites[i] = s
 
     for i, d := range img.Delay {
       // img.Delay is in centiseconds
@@ -165,15 +173,48 @@ func (mkr *SpriteMaker) Write(w io.Writer) error {
     if ext := filepath.Ext(s.Name); ext != "" {
       s.Name = strings.TrimPrefix(s.Name, ext)
     }
+  }
 
-    seqwidth := s.FrameWidth * s.FrameCount
-    if seqwidth > sheetsize.Max.X {
-      sheetsize.Max.X = seqwidth
+  spriteOrder := make([]int, len(paths))
+  for i := range len(paths) {
+    spriteOrder[i] = i
+  }
+
+  // sort indices by descending sprite width
+  sort.Slice(spriteOrder, func(i, j int) bool{
+    return spriteWidths[spriteOrder[i]] > spriteWidths[spriteOrder[j]]
+  })
+
+  var left, top, nextRow int
+  // alg is O(n^2)
+  maxIterations := len(spriteOrder) * len(spriteOrder)
+  for len(spriteOrder) > 0 {
+    if maxIterations <= 0 {
+      return errors.New("max iterations hit trying to compact spritesheet (this is a bug)")
     }
-    sheetsize.Max.Y += s.FrameHeight
-
-    gifs = append(gifs, img)
-    sprites = append(sprites, s)
+    maxIterations--
+    idx := -1
+    for i, si := range spriteOrder {
+      if left + spriteWidths[si] <= sheetsize.Max.X {
+        idx = si
+        spriteOrder = slices.Delete(spriteOrder, i, i + 1)
+        break
+      }
+    }
+    if idx < 0 {
+      top = nextRow
+      left = 0
+      continue
+    }
+    s := sprites[idx]
+    s.FirstFrameX = left
+    s.FirstFrameY = top
+    left += spriteWidths[idx]
+    bottom := top + s.FrameHeight
+    if bottom > nextRow {
+      nextRow = bottom
+      sheetsize.Max.Y = bottom
+    }
   }
 
   if sheetsize.Max.X == 0 || sheetsize.Max.Y == 0 {
