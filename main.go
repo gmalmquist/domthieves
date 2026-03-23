@@ -13,10 +13,7 @@ import (
 
 func main() {
   if len(os.Args) >= 3 && os.Args[1] == "spritesheet" {
-    err := spritemaker.GifToSpritesheet(os.Args[2:]...)
-    if err != nil {
-      log.Fatal(err)
-    }
+    spritemaker.Cli(os.Args[2:]...)
     return
   }
 
