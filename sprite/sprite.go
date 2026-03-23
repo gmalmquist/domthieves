@@ -17,15 +17,6 @@ type Sprite struct {
 	// semantic "feet" of the sprite.
 	FigureInset Inset `json:"figure_inset"`
 
-	// For animated gifs. Mutually exclusive with FrameURLs and SheetFrames.
-	GIFUrl string `json:"gif_url"`
-
-	// URLs of individual frames. Mutually exclusive with GIFUrl and SheetFrames.
-	FrameURLs []string `json:"frame_urls"`
-
-	// Instead get frames from a sprite sheet. Mutually exclusive with FrameURLs and GIFUrl.
-	SheetFrames *SheetFrames `json:"sheet_frames"`
-
 	// 0 means the sprite is not animated
 	FPS int `json:"fps"`
 
@@ -37,8 +28,8 @@ type Sprite struct {
 	// the sprite will move the specified amount on each frame.
 	DistanceMovedPerFrame []int `json:"distance_moved_per_frame"`
 
-	// How many times the sprite animation loops
-	LoopCount Loop `json:"loop"`
+	// -1 equals infinite, 0 equals once, 1+ is n+1
+	LoopCount int `json:"loop_count"`
 }
 
 type Inset struct {
@@ -48,8 +39,8 @@ type Inset struct {
 	Bottom int `json:"bottom"`
 }
 
-type SheetFrames struct {
-	URL         string `json:"url"`
+type SheetSprite struct {
+  Name        string `json:"name"`
 	FirstFrameX int    `json:"first_frame_x"`
 	FirstFrameY int    `json:"first_frame_y"`
 	FrameWidth  int    `json:"frame_width"`
@@ -57,9 +48,5 @@ type SheetFrames struct {
 	FrameCount  int    `json:"frame_count"`
 }
 
-type LoopCount string
-
-const (
-	LoopForever LoopCount = "loop_forever"
-	LoopOnce              = "loop_once"
-)
+type Spritesheet struct {
+}

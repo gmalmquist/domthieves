@@ -4,12 +4,22 @@ import (
   "domthieves/api"
   "domthieves/thief"
   "domthieves/names"
+  "domthieves/sprite/spritemaker"
 
   "fmt"
   "log"
+  "os"
 )
 
 func main() {
+  if len(os.Args) >= 3 && os.Args[1] == "spritesheet" {
+    err := spritemaker.GifToSpritesheet(os.Args[2:]...)
+    if err != nil {
+      log.Fatal(err)
+    }
+    return
+  }
+
   fmt.Println("⎽⎼⎻⎽⎼⎻⎽⎼⎻ DOM THIEVES ⎽⎼⎻⎽⎼⎻⎽⎼⎻")
 
   hostname := ":7007"
