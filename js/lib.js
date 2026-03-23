@@ -156,7 +156,7 @@ DT.CleanCopyDOM = original => {
       return null;
   }
 
-  if (DT.illegalTags[original.tagName.toLocaleLowerCase()]) {
+  if (!DT.safeTags[original.tagName.toLocaleLowerCase()]) {
     return null;
   }
 
@@ -507,25 +507,43 @@ DT.Recruit = async () => {
   thief.moveToward = (el, delta) => {
     const src = Geom.getDocumentBoundingRect(spriteblock);
     const dst = Geom.getDocumentBoundingRect(el);
+    const viewport = Geom.viewport();
+
     let dx = 0;
     let dy = 0;
     if (dst.right < src.left - reach) {
-      dx = -1;
+      dx = dst.right - (src.left - reach);
     } else if (dst.left > src.right + reach) {
-      dx = 1;
+      dx = dst.left - (src.right + reach);
     }
 
     if (dst.bottom < src.top - reach) {
-      dy = -1;
+      dy = dst.bottom - (src.top - reach);
     } else if (dst.top > src.bottom + reach) {
-      dy = 1;
+      dy = dst.top - (src.bottom + reach);
     }
+
+    if (dst.bottom - src.height >= viewport.top && dst.bottom <= viewport.bottom) {
+      // prefer standing on level with the bottom of
+      // the thing we want to steal
+      dy = (dst.bottom - src.height) - src.top;
+    }
+
+    dx /= thief.speed * 1.0;
+    dy /= thief.speed * 1.0;
 
     if (dx === 0 && dy === 0) {
       return false;
     }
+    const hypotenuse = Math.sqrt(dx * dx + dy * dy);
+    if (hypotenuse < 0.1) {
+      return false;
+    }
 
-    thief.moveBy(dx * delta, dy * delta);
+    thief.moveBy(
+      dx * delta / hypotenuse,
+      dy * delta / hypotenuse
+    );
     return true;
   };
 
@@ -625,7 +643,7 @@ DT.Offer = async (item) => {
 };
 
 DT.Initialize = async () => {
-  DT.illegalTags = await DT.Fetch('/illegal-tags').then(r => r.json());
+  DT.safeTags = await DT.Fetch('/safehtml/tags').then(r => r.json());
   DT.guild = 'global';
   DT.inventory = [];
   DT.thieves = [];

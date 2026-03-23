@@ -10,27 +10,97 @@ import (
   "strings"
 )
 
-var DangerousTags = map[string]bool{
-  "body": true,
-  "button": true,
-  "datalist": true,
-  "data": true,
-  "fieldset": true,
-  "form": true,
-  "head": true,
-  "html": true,
-  "input": true,
-  "legend": true,
-  "link": true,
-  "meta": true,
-  "optgroup": true,
-  "option": true,
-  "output": true,
-  "script": true,
-  "select": true,
-  "style": true,
-  "textarea": true,
-}
+var SafeTags = (func() map[string]bool {
+  m := map[string]bool{}
+  for _, s := range []string{
+    "a",
+    "abbr",
+    "acronym",
+    "area",
+    "aside",
+    "audio",
+    "b",
+    "bdi",
+    "bdo",
+    "big",
+    "blockquote",
+    "br",
+    "caption",
+    "center",
+    "cite",
+    "code",
+    "col",
+    "colgroup",
+    "dd",
+    "del",
+    "details",
+    "div",
+    "dl",
+    "em",
+    "figcaption",
+    "figure",
+    "font",
+    "footer",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "header",
+    "hgroup",
+    "hr",
+    "i",
+    "img",
+    "ins",
+    "label",
+    "legend",
+    "li",
+    "map",
+    "mark",
+    "marquee",
+    "math",
+    "menu",
+    "meter",
+    "nobr",
+    "ol",
+    "p",
+    "plaintext",
+    "pre",
+    "progress",
+    "q",
+    "rb",
+    "rp",
+    "rtc",
+    "ruby",
+    "s",
+    "samp",
+    "span",
+    "strike",
+    "strong",
+    "sub",
+    "summary",
+    "sup",
+    "svg",
+    "table",
+    "tbody",
+    "td",
+    "tfoot",
+    "th",
+    "thead",
+    "tr",
+    "track",
+    "tt",
+    "u",
+    "ul",
+    "video",
+    "wbr",
+    "xmp",
+  } {
+    m[s] = true
+  }
+  return m
+})()
 
 type LootID string
 
@@ -106,7 +176,7 @@ func (loot *Loot) Validate() error {
 
 func checkElementNode(node *html.Node) error {
   tag := strings.ToLower(node.Data)
-  if DangerousTags[tag] {
+  if !SafeTags[tag] {
     return errors.New(fmt.Sprintf("400 dangerous tag %v", tag))
   }
   if node.Attr != nil {

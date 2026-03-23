@@ -64,7 +64,7 @@ Geom.getDocumentBoundingRect = function(element) {
 }
 
 /* Clips the bounding rect to the viewport */
-Geom.visibleBoundingRect = function(element) {
+Geom.getVisibleBoundingRect = function(element) {
   return Geom.intersectRects(Geom.getDocumentBoundingRect(element), Geom.viewport());
 }
 
