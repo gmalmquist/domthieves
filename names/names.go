@@ -6,7 +6,6 @@ import (
   "domthieves/rutil"
 
   "bufio"
-  "errors"
   "fmt"
   "log"
   "math/rand"
@@ -98,7 +97,7 @@ func LoadCulture(path string) (*Culture, error) {
       if len(args) > 0 {
         msg = fmt.Sprintf(msg, args...)
       }
-      return errors.New(fmt.Sprintf("%v:%v: %v:\n%v", path, lineno, msg, line))
+      return fmt.Errorf("%v:%v: %v:\n%v", path, lineno, msg, line)
     }
 
     if currSet == nil {

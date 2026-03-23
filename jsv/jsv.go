@@ -2,7 +2,6 @@ package jsv
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -42,9 +41,9 @@ func MarshalMap(m map[string]any) (map[string]JsonValue, error) {
 }
 
 func (v JsonValue) nota(kind string) error {
-	return errors.New(fmt.Sprintf(
+	return fmt.Errorf(
 		"%v is not a %v", v.JSON(), kind,
-	))
+	)
 }
 
 func (v JsonValue) String() string {
@@ -154,9 +153,9 @@ func (a Validate) And(b Validate) Validate {
 		if berr == nil {
 			return aerr
 		}
-		return errors.New(fmt.Sprintf(
+		return fmt.Errorf(
 			"%v, %v", aerr, berr,
-		))
+		)
 	}
 }
 
@@ -167,9 +166,9 @@ func (a Validate) Or(b Validate) Validate {
 		if aerr == nil || berr == nil {
 			return nil
 		}
-		return errors.New(fmt.Sprintf(
+		return fmt.Errorf(
 			"%v, %v", aerr, berr,
-		))
+		)
 	}
 }
 
@@ -188,12 +187,12 @@ func (v JsonValue) Resolve(path string) (JsonValue, error) {
     }
     m, err := node.Map()
     if err != nil {
-      return nil, errors.New(fmt.Sprintf("%v is not a map", sofar))
+      return nil, fmt.Errorf("%v is not a map", sofar)
     }
     var ok bool
     node, ok = m[part]
     if !ok {
-      return nil, errors.New(fmt.Sprintf("%v.%v is nil", sofar, part))
+      return nil, fmt.Errorf("%v.%v is nil", sofar, part)
     }
     sofar = fmt.Sprintf("%v.%v", sofar, part)
   }

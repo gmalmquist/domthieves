@@ -5,7 +5,6 @@ import (
   "golang.org/x/net/html"
 
   "bytes"
-  "errors"
   "fmt"
   "strings"
 )
@@ -157,7 +156,7 @@ func (loot *Loot) Validate() error {
   is := bytes.NewBuffer([]byte(loot.DOM))
   docs, err := html.ParseFragment(is, nil)
   if err != nil {
-    return errors.New(fmt.Sprintf("400 bad HTML: %v", err))
+    return fmt.Errorf("400 bad HTML: %v", err)
   }
 
   for _, doc := range docs {
@@ -177,13 +176,13 @@ func (loot *Loot) Validate() error {
 func checkElementNode(node *html.Node) error {
   tag := strings.ToLower(node.Data)
   if !SafeTags[tag] {
-    return errors.New(fmt.Sprintf("400 dangerous tag %v", tag))
+    return fmt.Errorf("400 dangerous tag %v", tag)
   }
   if node.Attr != nil {
     for _, a := range node.Attr {
       name := strings.ToLower(a.Key)
       if strings.HasPrefix(name, "on") {
-        return errors.New(fmt.Sprintf("400 dangerous event listener %v", name))
+        return fmt.Errorf("400 dangerous event listener %v", name)
       }
     }
   }

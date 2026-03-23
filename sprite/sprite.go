@@ -4,10 +4,19 @@ type Sprite struct {
 	Name string `json:"name"`
 
 	// Width of an individual frame in pixels
-	Width int `json:"width"`
+	FrameWidth int `json:"frame_width"`
 
 	// Height of an individual frame in pixels
-	Height int `json:"height"`
+	FrameHeight int `json:"frame_height"`
+
+  // Top-left corner of first frame in spritesheet
+	FirstFrameX int    `json:"first_frame_x"`
+
+  // Top-left corner of first frame in spritesheet
+	FirstFrameY int    `json:"first_frame_y"`
+
+  // How many frames are in the spirte
+	FrameCount  int    `json:"frame_count"`
 
 	// Inset (padding) of the figure of the sprite,
 	// if it is smaller than the size of the frame.
@@ -17,8 +26,8 @@ type Sprite struct {
 	// semantic "feet" of the sprite.
 	FigureInset Inset `json:"figure_inset"`
 
-	// 0 means the sprite is not animated
-	FPS int `json:"fps"`
+  // Duration of each frame in milliseconds.
+	DelayMilli[] int `json:"delay_milli"`
 
 	// Distance moved per frame (in pixels), for walking animations etc.
 	//
@@ -39,14 +48,8 @@ type Inset struct {
 	Bottom int `json:"bottom"`
 }
 
-type SheetSprite struct {
-  Name        string `json:"name"`
-	FirstFrameX int    `json:"first_frame_x"`
-	FirstFrameY int    `json:"first_frame_y"`
-	FrameWidth  int    `json:"frame_width"`
-	FrameHeight int    `json:"frame_height"`
-	FrameCount  int    `json:"frame_count"`
+type Spritesheet struct {
+  URL string `json:"url"`
+  Sprites map[string]*Sprite
 }
 
-type Spritesheet struct {
-}

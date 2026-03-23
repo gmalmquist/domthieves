@@ -7,6 +7,7 @@ import (
   "errors"
   "fmt"
   "image"
+  "image/color"
   "image/draw"
   "image/gif"
   "image/png"
@@ -14,6 +15,18 @@ import (
   "path/filepath"
   "strings"
 )
+
+type ChromaKeyMode string
+const (
+  ChromeKeyNone ChromaKeyMode = ""
+  ChromaKeyOutsideIn = "outside-in"
+  ChromaKeyAll = "all"
+)
+
+type SpriteMaker struct {
+  ChromaKeyMode ChromaKeyMode
+  ChromakeyColor color.RGBA
+}
 
 
 func GifToSpritesheet(args ...string) error {
@@ -39,20 +52,27 @@ func GifToSpritesheet(args ...string) error {
     Max: image.Pt(0, 0),
   }
   gifs := []*gif.GIF{}
-  sprites := []*sprite.SheetSprite{}
+  sprites := []*sprite.Sprite{}
   for _, path := range paths {
     img, err := loadGIF(path)
     if err != nil {
-      return errors.New(fmt.Sprintf("Couldn't load %v: %v", path, err))
+      return fmt.Errorf("Couldn't load %v: %v", path, err)
     }
 
-    s := &sprite.SheetSprite{
+    s := &sprite.Sprite{
+      Name: filepath.Base(path),
       FirstFrameX: 0,
       FirstFrameY: sheetsize.Max.Y,
       FrameWidth: img.Config.Width,
       FrameHeight: img.Config.Height,
       FrameCount: len(img.Image),
-      Name: filepath.Base(path),
+      LoopCount: img.LoopCount,
+      DelayMilli: make([]int, len(img.Image)),
+    }
+
+    for i, d := range img.Delay {
+      // img.Delay is in centiseconds
+      s.DelayMilli[i] = d * 10
     }
 
     if ext := filepath.Ext(s.Name); ext != "" {

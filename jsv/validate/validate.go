@@ -19,7 +19,7 @@ func named(name string, msg string, err error) error {
 
 func namedStr(name string, msg string, args ...any) error {
   if len(args) > 0 {
-    return errors.New(fmt.Sprintf(msg, args...))
+    return fmt.Errorf(msg, args...)
   }
   return errors.New(join(" ", name, msg))
 }
