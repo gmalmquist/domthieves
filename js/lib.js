@@ -6,8 +6,6 @@ const USELESS = 'useless';
 const ILLEGAL_TAG = 'illegal_tag';
 const HIDDEN = 'hidden';
 
-const A_APPEAR = 'appear';
-
 DT.ApiRoot = 'https://domthieves.gwen.run/api';
 
 DT.Fetch = async (path, args) => {
@@ -310,8 +308,8 @@ DT.Recruit = async () => {
     meta,
     task: null,
     node: null,
-    anim: A_APPEAR,
-    speed: 64.0,
+    speed: 16.0,
+    anim: null,
   };
 
   let size = 32; // ??
@@ -363,6 +361,13 @@ DT.Recruit = async () => {
   thief.node = node;
   thief._nametagAction = '';
   thief.taskQueue = [];
+
+  if (!isEmpty(meta.spritesheet)) {
+    thief.anim = await DT.FetchSpritesheet(meta.spritesheet);
+    if (isSome(thief.anim)) {
+      spriteblock.appendChild(thief.anim.spriteview);
+    }
+  }
 
   thief.showNametag = () => {
     const task = thief.newTask('showing nametag', (_, task) => {
@@ -504,6 +509,43 @@ DT.Recruit = async () => {
     node.style.top = `${bounds.top + dy}px`;
   };
 
+  thief.getCentroidDelta = el => {
+    const src = Geom.getDocumentBoundingRect(spriteblock);
+    const dst = Geom.getDocumentBoundingRect(el);
+    const s = { x: (src.left/2 + src.right/2), y: (src.top/2 + src.bottom/2) };
+    const d = { x: (dst.left/2 + dst.right/2), y: (dst.top/2 + dst.bottom/2) };
+    return { x: d.x - s.x, y: d.y - s.y };
+  };
+
+
+  thief.getDeltaTo = el => {
+    const src = Geom.getDocumentBoundingRect(spriteblock);
+    const dst = Geom.getDocumentBoundingRect(el);
+    const viewport = Geom.viewport();
+
+    let dx = 0;
+    let dy = 0;
+    if (dst.right < src.left - reach) {
+      dx = dst.right - (src.left - reach);
+    } else if (dst.left > src.right + reach) {
+      dx = dst.left - (src.right + reach);
+    }
+
+    if (dst.bottom < src.top - reach) {
+      dy = dst.bottom - (src.top - reach);
+    } else if (dst.top > src.bottom + reach) {
+      dy = dst.top - (src.bottom + reach);
+    }
+
+    if (dst.bottom - src.height >= viewport.top && dst.bottom <= viewport.bottom) {
+      // prefer standing on level with the bottom of
+      // the thing we want to steal
+      dy = Math.round((dst.bottom - src.height) - src.top);
+    }
+
+    return { x: dx, y: dy };
+  };
+
   thief.moveToward = (el, delta) => {
     const src = Geom.getDocumentBoundingRect(spriteblock);
     const dst = Geom.getDocumentBoundingRect(el);
@@ -526,15 +568,23 @@ DT.Recruit = async () => {
     if (dst.bottom - src.height >= viewport.top && dst.bottom <= viewport.bottom) {
       // prefer standing on level with the bottom of
       // the thing we want to steal
-      dy = (dst.bottom - src.height) - src.top;
+      dy = Math.round((dst.bottom - src.height) - src.top);
     }
-
-    dx /= thief.speed * 1.0;
-    dy /= thief.speed * 1.0;
 
     if (dx === 0 && dy === 0) {
       return false;
     }
+
+    if (Math.abs(dy) > 0) {
+      // We prioritize walking up, then horizontally. Just looks better.
+      if (dy < 0) {
+        thief.play('walk-b');
+      } else {
+        thief.play('walk-f');
+      }
+      return true;
+    }
+
     const hypotenuse = Math.sqrt(dx * dx + dy * dy);
     if (hypotenuse < 0.1) {
       return false;
@@ -551,21 +601,77 @@ DT.Recruit = async () => {
     const el = DT.PhantomClone(item);
     el.style.opacity = '0';
     document.body.appendChild(el);
-    const task = thief.newTask(`walking to ${item.item.name}`, (dt) => {
-      if (!thief.moveToward(el, dt * thief.speed)) {
-        el.remove();
-        return false;
+    const state = {
+      dir: '',
+      gottenClose: false,
+    };
+    const march = (dir, dx, dy) => {
+      state.dir = dir;
+      if (dir === thief.anim.playing) {
+        return;
       }
-      return true;
+      thief.play(dir, tick => {
+        if (dir === tick.animation) {
+          const delta = isSome(tick.distance)
+            ? tick.distance
+            : tick.delay * thief.speed / 1000
+            //: 2
+          ;
+          thief.moveBy(dx * delta, dy * delta);
+        }
+        return dir === state.dir;
+      });
+    };
+    const task = thief.newTask(`walking to ${item.item.name}`, (dt) => {
+      const vector = thief.getDeltaTo(el);
+      if (!state.gottenClose && Math.abs(vector.x) + Math.abs(vector.y) < 50) {
+        thief.asyncTask(thief.hideNametag());
+        state.gottenClose = true;
+      }
+      if (Math.round(Math.abs(vector.y)) > 1) {
+        if (vector.y > 0) {
+          march('walk-f', 0, 1);
+        } else {
+          march('walk-b', 0, -1);
+        }
+        return true;
+      }
+      if (Math.round(Math.abs(vector.x)) > 1) {
+        if (vector.x > 0) {
+          march('walk-r', 1, 0);
+        } else {
+          march('walk-l', -1, 0);
+        }
+        return true;
+      }
+      state.dir = '';
+
+      const cv = thief.getCentroidDelta(el);
+      if (cv.x > 0) {
+        thief.play('stand-r');
+      } else if (cv.x < 0) {
+        thief.play('stand-l');
+      } else if (cv.y < 0) {
+        thief.play('stand-b');
+      } else {
+        thief.play('stand-f');
+      }
+     
+      return false;
     });
     thief.addTask(task);
   };
 
   thief.take = item => {
-    thief.flashNametag();
+    thief.addTask(thief.showNametag());
     thief.walkTo(item);
     thief.addTask(thief.hideNametag());
     thief.addTask(thief.newTask('taking', (dt) => {
+      if (thief.anim.lastPlayed === 'stand-l' || thief.anim.lastPlayed === 'walk-l') {
+        thief.play('reach-l');
+      } else if (thief.anim.lastPlayed === 'stand-r' || thief.anim.lastPlayed === 'walk-r') {
+        thief.play('reach-r');
+      }
       const el = DT.Steal(item);
       el.style.transitionProperty = 'transform';
       el.style.transitionDuration = '0.5s';
@@ -588,6 +694,7 @@ DT.Recruit = async () => {
         setTimeout(() => {
           el.style.display = 'none';
           el.remove();
+          thief.play('stand-f');
           // TODO: send to server! we got it!
         }, 500);
       }, 10);
@@ -595,9 +702,46 @@ DT.Recruit = async () => {
     thief.addTask(thief.showNametag());
   };
 
+  thief.play = (animation, listener) => {
+    if (isNone(thief.anim)) {
+      return;
+    }
+    if (thief.anim.playing === animation) {
+      return;
+    }
+    if (isSome(listener)) {
+      thief.anim.tickers.push(tick => {
+        return listener(tick);
+      });
+    }
+    thief.anim.play(animation);
+  };
+
+  thief.addAnimTask = (animation) => {
+    if (isNone(thief.anim)) {
+      return;
+    }
+    console.log('task: play', animation);
+    thief.anim.play(animation);
+    thief.anim.stop();
+    thief.addTask(thief.newTask(animation, dt => {
+      return isSome(thief.anim) && !isEmpty(thief.anim.playing);
+    }));
+  };
+
   const delay = 20;
   const dt = (delay / 1000.0);
   thief.taskLoop = setInterval(() => {
+    // housekeeping
+    if (isSome(thief.anim)) {
+      const sprite = thief.anim.spritesheet.sprite_map[thief.anim.playing];
+      if (isSome(sprite)) {
+        spriteblock.style.width = `${sprite.frame_width}px`;
+        spriteblock.style.height = `${sprite.frame_height}px`;
+        spriteblock.style.backgroundColor = 'unset';
+      }
+    }
+
     const task = thief.task;
     if (!isSome(task) || task.state !== 'running') {
       const queue = thief.taskQueue;
@@ -624,9 +768,147 @@ DT.Recruit = async () => {
   thief.moveTo(window.innerWidth/2, window.innerHeight/2);
   thief.asyncTask(thief.showNametag());
 
+  thief.addAnimTask('appear');
+
   document.body.appendChild(thief.node);
   DT.thieves.push(thief);
   return thief;
+};
+
+DT.FetchSpritesheet = async (url) => {
+  const resp = await fetch(url);
+  if (!resp.ok) {
+    console.error(`couldn't load spritesheet at ${url}`);
+    return null;
+  }
+
+  const spritesheet = await resp.json();
+
+  if (!spritesheet.url.startsWith('http:')
+    && !spritesheet.url.startsWith('https:')) {
+    if (spritesheet.url.startsWith('/')) {
+      spritesheet.url = spritesheet.url.substring(1);
+    }
+    if (url.endsWith('/')) {
+      spritesheet.url = `${url}${spritesheet.url}`;
+    } else {
+      const slash = url.lastIndexOf('/');
+      spritesheet.url = `${url.substring(0, slash)}/${spritesheet.url}`;
+    }
+  }
+
+  if (isEmpty(spritesheet.sprite_map)) {
+    return null;
+  }
+
+  const spriteview = document.createElement('div');
+  spriteview.style.position = 'absolute';
+  spriteview.style.display = 'block';
+  spriteview.style.overflow = 'hidden';
+  spriteview.style.userSelect = 'none';
+  spriteview.style.backgroundRepeat = 'no-repeat';
+  spriteview.style.backgroundPosition = '0px 0px';
+  spriteview.style.backgroundImage = `url("${spritesheet.url}")`;
+  spriteview.style.width = '1px';
+  spriteview.style.height = '1px';
+
+  const anim = {
+    spritesheet,
+    spriteview,
+    playing: '',
+    frameIndex: 0,
+    stopRequest: null,
+    tickers: [],
+    finishCallbacks: [],
+  };
+
+  anim.play = (name) => {
+    const first = !isEmpty(name) && name !== anim.playing;
+    const sprite = !isEmpty(name) ? spritesheet.sprite_map[name] : spritesheet.sprite_map[anim.playing];
+    if (isNone(sprite)) {
+      if (!isEmpty(anim.playing)) {
+        anim.stop();
+        return;
+      }
+      anim._finish(sprite.name);
+      return;
+    }
+    anim.playing = sprite.name;
+    anim.lastPlayed = sprite.name;
+    if (first) {
+      anim.spriteview.style.width = `${sprite.frame_width}px`;
+      anim.spriteview.style.height = `${sprite.frame_height}px`;
+      anim.iter = 0;
+      anim.frameIndex = 0;
+    }
+    if (anim.frameIndex >= sprite.frame_count) {
+      anim.frameIndex = 0;
+    }
+    anim.spriteview.style.backgroundPosition = `${-sprite.first_frame_x - sprite.frame_width * anim.frameIndex}px ${-sprite.first_frame_y}px`;
+
+    const tick = {
+      animation: sprite.name,
+      frameIndex: anim.frameIndex,
+      frameCount: sprite.frame_count,
+      delay: sprite.delay_milli[anim.frameIndex],
+      iteration: anim.iter,
+      loopCount: sprite.loop_count,
+      distance: isEmpty(sprite.distance_moved_per_frame)
+        ? null : sprite.distance_moved_per_frame[anim.frameIndex],
+    };
+
+    const tickers = [...anim.tickers];
+    anim.tickers = [];
+    for (const ticker of tickers) {
+      if (ticker(tick)) {
+        anim.tickers.push(ticker);
+      }
+    }
+
+    if (anim.frameIndex === sprite.frame_count - 1 && sprite.loop_count !== 0) {
+      if (isSome(anim.stopRequest)) {
+        if (typeof anim.stopRequest === 'function') {
+          anim.stopRequest();
+        }
+        anim.stopRequest = null;
+        anim.playing = '';
+        anim._finish(sprite.name);
+        return
+      }
+      if (sprite.loop_count < 0 || anim.iter >= sprite.loop_count) {
+        anim.playing = '';
+        anim._finish(sprite.name);
+        return;
+      }
+    }
+
+    setTimeout(() => {
+      if (sprite.name !== anim.playing) {
+        return;
+      }
+      anim.frameIndex += 1;
+      anim.play(sprite.name);
+    }, sprite.delay_milli[anim.frameIndex]);
+  };
+
+  anim.onFinish = () => new Promise(resolve => {
+    if (isEmpty(anim.playing)) {
+      resolve();
+      return;
+    }
+    anim.finishCallbacks.push(resolve);
+  });
+
+  anim._finish = (animation) => {
+    anim.finishCallbacks.forEach(c => c(animation));
+    anim.finishCallbacks = [];
+  };
+
+  anim.stop = () => new Promise(resolve => {
+    anim.stopRequest = resolve;
+  });
+
+  return anim;
 };
 
 DT.Offer = async (item) => {

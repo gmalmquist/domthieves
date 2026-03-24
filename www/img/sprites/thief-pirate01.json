@@ -1,1 +1,225 @@
-{"url":"thief-pirate01.png","sprite_map":{"thief-pirate-appear":{"name":"thief-pirate-appear","frame_width":16,"frame_height":32,"first_frame_x":0,"first_frame_y":0,"frame_count":8,"figure_inset":{"left":0,"right":0,"top":0,"bottom":0},"delay_milli":[100,100,100,100,100,100,100,100],"distance_moved_per_frame":null,"loop_count":0},"thief-pirate-reach-l":{"name":"thief-pirate-reach-l","frame_width":16,"frame_height":32,"first_frame_x":0,"first_frame_y":64,"frame_count":1,"figure_inset":{"left":0,"right":0,"top":0,"bottom":0},"delay_milli":[0],"distance_moved_per_frame":null,"loop_count":-1},"thief-pirate-reach-r":{"name":"thief-pirate-reach-r","frame_width":16,"frame_height":32,"first_frame_x":16,"first_frame_y":64,"frame_count":1,"figure_inset":{"left":0,"right":0,"top":0,"bottom":0},"delay_milli":[0],"distance_moved_per_frame":null,"loop_count":-1},"thief-pirate-stand-b":{"name":"thief-pirate-stand-b","frame_width":16,"frame_height":32,"first_frame_x":32,"first_frame_y":64,"frame_count":1,"figure_inset":{"left":0,"right":0,"top":0,"bottom":0},"delay_milli":[250],"distance_moved_per_frame":null,"loop_count":-1},"thief-pirate-stand-f":{"name":"thief-pirate-stand-f","frame_width":16,"frame_height":32,"first_frame_x":48,"first_frame_y":64,"frame_count":1,"figure_inset":{"left":0,"right":0,"top":0,"bottom":0},"delay_milli":[100],"distance_moved_per_frame":null,"loop_count":-1},"thief-pirate-walk2-b":{"name":"thief-pirate-walk2-b","frame_width":16,"frame_height":32,"first_frame_x":0,"first_frame_y":32,"frame_count":2,"figure_inset":{"left":0,"right":0,"top":0,"bottom":0},"delay_milli":[250,250],"distance_moved_per_frame":null,"loop_count":0},"thief-pirate-walk2-f":{"name":"thief-pirate-walk2-f","frame_width":16,"frame_height":32,"first_frame_x":32,"first_frame_y":32,"frame_count":2,"figure_inset":{"left":0,"right":0,"top":0,"bottom":0},"delay_milli":[250,250],"distance_moved_per_frame":null,"loop_count":0},"thief-pirate-walk2-l":{"name":"thief-pirate-walk2-l","frame_width":16,"frame_height":32,"first_frame_x":64,"first_frame_y":32,"frame_count":2,"figure_inset":{"left":0,"right":0,"top":0,"bottom":0},"delay_milli":[250,250],"distance_moved_per_frame":null,"loop_count":0},"thief-pirate-walk2-r":{"name":"thief-pirate-walk2-r","frame_width":16,"frame_height":32,"first_frame_x":96,"first_frame_y":32,"frame_count":2,"figure_inset":{"left":0,"right":0,"top":0,"bottom":0},"delay_milli":[250,250],"distance_moved_per_frame":null,"loop_count":0}}}
+{
+  "url": "thief-pirate01.png",
+  "sprite_map": {
+    "appear": {
+      "name": "appear",
+      "frame_width": 16,
+      "frame_height": 32,
+      "first_frame_x": 0,
+      "first_frame_y": 0,
+      "frame_count": 8,
+      "figure_inset": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "delay_milli": [
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50
+      ],
+      "distance_moved_per_frame": null,
+      "loop_count": -1
+    },
+    "reach-l": {
+      "name": "reach-l",
+      "frame_width": 16,
+      "frame_height": 32,
+      "first_frame_x": 0,
+      "first_frame_y": 64,
+      "frame_count": 1,
+      "figure_inset": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "delay_milli": [
+        0
+      ],
+      "distance_moved_per_frame": null,
+      "loop_count": -1
+    },
+    "reach-r": {
+      "name": "reach-r",
+      "frame_width": 16,
+      "frame_height": 32,
+      "first_frame_x": 16,
+      "first_frame_y": 64,
+      "frame_count": 1,
+      "figure_inset": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "delay_milli": [
+        0
+      ],
+      "distance_moved_per_frame": null,
+      "loop_count": -1
+    },
+    "stand-b": {
+      "name": "stand-b",
+      "frame_width": 16,
+      "frame_height": 32,
+      "first_frame_x": 32,
+      "first_frame_y": 64,
+      "frame_count": 1,
+      "figure_inset": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "delay_milli": [
+        250
+      ],
+      "distance_moved_per_frame": null,
+      "loop_count": -1
+    },
+    "stand-f": {
+      "name": "stand-f",
+      "frame_width": 16,
+      "frame_height": 32,
+      "first_frame_x": 48,
+      "first_frame_y": 64,
+      "frame_count": 1,
+      "figure_inset": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "delay_milli": [
+        100
+      ],
+      "distance_moved_per_frame": null,
+      "loop_count": -1
+    },
+    "stand-l": {
+      "name": "stand-l",
+      "frame_width": 16,
+      "frame_height": 32,
+      "first_frame_x": 80,
+      "first_frame_y": 32,
+      "frame_count": 1,
+      "figure_inset": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "delay_milli": [
+        250
+      ],
+      "distance_moved_per_frame": null,
+      "loop_count": -1
+    },
+    "stand-r": {
+      "name": "stand-r",
+      "frame_width": 16,
+      "frame_height": 32,
+      "first_frame_x": 112,
+      "first_frame_y": 32,
+      "frame_count": 1,
+      "figure_inset": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "delay_milli": [
+        250
+      ],
+      "distance_moved_per_frame": null,
+      "loop_count": -1
+    },
+    "walk-b": {
+      "name": "walk-b",
+      "frame_width": 16,
+      "frame_height": 32,
+      "first_frame_x": 0,
+      "first_frame_y": 32,
+      "frame_count": 2,
+      "figure_inset": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "delay_milli": [
+        100,
+        100
+      ],
+      "distance_moved_per_frame": [4, 4],
+      "loop_count": 0
+    },
+    "walk-f": {
+      "name": "walk-f",
+      "frame_width": 16,
+      "frame_height": 32,
+      "first_frame_x": 32,
+      "first_frame_y": 32,
+      "frame_count": 2,
+      "figure_inset": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "delay_milli": [
+        100,
+        100
+      ],
+      "distance_moved_per_frame": null,
+      "loop_count": 0
+    },
+    "walk-l": {
+      "name": "walk-l",
+      "frame_width": 16,
+      "frame_height": 32,
+      "first_frame_x": 64,
+      "first_frame_y": 32,
+      "frame_count": 2,
+      "figure_inset": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "delay_milli": [
+        100,
+        100
+      ],
+      "distance_moved_per_frame": null,
+      "loop_count": 0
+    },
+    "walk-r": {
+      "name": "walk-r",
+      "frame_width": 16,
+      "frame_height": 32,
+      "first_frame_x": 96,
+      "first_frame_y": 32,
+      "frame_count": 2,
+      "figure_inset": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "delay_milli": [
+        100,
+        100
+      ],
+      "distance_moved_per_frame": null,
+      "loop_count": 0
+    }
+  }
+}
