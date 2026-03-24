@@ -50,6 +50,6 @@ type Inset struct {
 
 type Spritesheet struct {
   URL string `json:"url"`
-  Sprites map[string]*Sprite
+  Sprites map[string]*Sprite `json:"sprite_map"`
 }
 

@@ -1,6 +1,7 @@
 package thief
 
 import (
+  "domthieves/config"
   "domthieves/names"
 
   "github.com/gammazero/deque"
@@ -96,12 +97,14 @@ func (g *Guild) Recruit(offer JobOffer) *Thief {
   thief.JobDescription = offer.JobDescription
 
   if thief.Spritesheet == "" {
-    if g.Spritesheets != nil && len(g.Spritesheets) > 0 {
-      var h maphash.Hash
-      h.WriteString(string(thief.ID))
-      idx := int(h.Sum64() % uint64(len(g.Spritesheets)))
-      thief.Spritesheet = g.Spritesheets[idx]
+    spritesheets := g.Spritesheets
+    if spritesheets == nil || len(spritesheets) == 0 {
+      spritesheets = config.Conf.DefaultThiefSpritesheets
     }
+    var h maphash.Hash
+    h.WriteString(string(thief.ID))
+    idx := int(h.Sum64() % uint64(len(spritesheets)))
+    thief.Spritesheet = spritesheets[idx]
   }
 
   now := time.Now()

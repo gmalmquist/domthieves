@@ -111,7 +111,7 @@ func Cli(args ...string) {
   }
 
   if mkr.JsonOutputPath == "" {
-    mkr.JsonOutputPath = fmt.Sprintf("%v.json", strings.TrimPrefix(mkr.ImageOutputPath, imgExt))
+    mkr.JsonOutputPath = fmt.Sprintf("%v.json", strings.TrimSuffix(mkr.ImageOutputPath, imgExt))
   }
   
   mkr.WriteToFile()
@@ -180,7 +180,7 @@ func (mkr *SpriteMaker) Write(w io.Writer) error {
     }
 
     if ext := filepath.Ext(s.Name); ext != "" {
-      s.Name = strings.TrimPrefix(s.Name, ext)
+      s.Name = strings.TrimSuffix(s.Name, ext)
     }
   }
 
@@ -291,7 +291,14 @@ func (mkr *SpriteMaker) Write(w io.Writer) error {
   }
   fmt.Fprintf(os.Stderr, "wrote spritesheet: %v\n", mkr.ImageOutputPath)
 
-  blob, err := jsv.Marshal(sprites)
+  spritesheet := sprite.Spritesheet{
+    URL: filepath.Base(mkr.ImageOutputPath),
+    Sprites: map[string]*sprite.Sprite{},
+  }
+  for _, s := range sprites {
+    spritesheet.Sprites[s.Name] = s
+  }
+  blob, err := jsv.Marshal(spritesheet)
   if err != nil {
     return fmt.Errorf("failed to marshal json metadata for spritesheet: %v", err)
   }
