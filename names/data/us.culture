@@ -48,6 +48,16 @@ The Gray Fox
 
 # Ultra Rare
 [HONORIFICS]
+P: 0.001
+Demon Lord
+Dread Lord
+Maō
+Ultra Pope
+Hyperpop Hydra
+Space Cadet
+
+# Very Rare
+[HONORIFICS]
 P: 0.01
 
 Cardinal
@@ -8061,13 +8071,36 @@ Viola
 
 [NICKNAME]
 P: 0.01
-"Bix"
-"Patty"
 "Axel"
-"X-treme"
-"The Razz"
-"The Ball"
+"Beans"
+"Big Britches"
+"Bix"
+"Crab Cakes"
+"DeLorean"
+"Dude"
+"Little Britches"
 "Maximum Legend"
+"Patty"
+"Phil"
+"The Ball"
+"The Razz"
+"The Rhino"
+"Tim"
+"X-treme"
+
+[NICKNAME]
+P: 0.001
+"21 Flavors"
+"Don't Call Me Shirley"
+"Night Stalker"
+"Oops There Goes Gravity"
+"Shiver Me Timbers"
+"Skullmuncher"
+"Spills-the-Beans"
+"Theodore Roosevelt"
+"Twice-Dead"
+Wilkes "No Relation" Booth
+"Colonel's Mustard"
 
 [MIDDLE 0-2]
 COPY: GIVEN
@@ -9171,11 +9204,6 @@ Bly
 Blyskal
 Blyszczak
 Blythe
-Bmethods
-Bnrecad
-Bnrinfo
-Bnrlsi
-Bnrsport
 Boal
 Boarder
 Boase
@@ -16231,7 +16259,6 @@ Meyer
 Meyerink
 Mezzano
 Mezzoiuso
-Mgmt
 Mia
 Miao
 Miasek
@@ -17799,14 +17826,7 @@ Probs
 Procaccio
 Procca
 Procner
-Procter
-Prodmfg
-Prodmgmt
-Production
 Proffit
-Prog
-Program-Office
-Projects
 Projofc
 Prokes
 Prokop
@@ -21436,6 +21456,7 @@ VII
 VIII
 IX
 X
+the Gay
 the Gray
 the White
 the Beige
@@ -21448,28 +21469,268 @@ the Suave
 [HOME]
 P: 0.0025
 de Marseille
+of Afghanistan
+of Albania
+of Algeria
+of American Samoa
+of Andorra
+of Angola
+of Anguilla
+of Antarctica
+of Antigua and Barbuda
+of Argentina
+of Armenia
+of Aruba
 of Atlanta
 of Australia
+of Australia
+of Austria
+of Azerbaidjan
+of Bahamas
+of Bahrain
+of Bangladesh
+of Barbados
 of Beijing
+of Belarus
+of Belgium
+of Belize
+of Benin
 of Berlin
+of Bermuda
+of Bhutan
+of Bolivia
+of Bosnia-Herzegovina
 of Boston
+of Botswana
+of Bouvet Island
+of Brazil
+of British Indian Ocean Territory
+of Brunei Darussalam
 of Buenos Aires
+of Bulgaria
+of Burkina Faso
+of Burundi
+of Cambodia
+of Cameroon
+of Canada
+of Cape Verde
+of Cayman Islands
+of Central African Republic
+of Chad
 of Chicago
+of Chile
+of China
+of Christmas Island
+of Cocos (Keeling) Islands
+of Colombia
+of Comoros
+of Congo
+of Cook Islands
+of Costa Rica
+of Croatia
+of Cuba
+of Cyprus
+of Czech Republic
+of Denmark
+of Djibouti
+of Dominica
+of Dominican Republic
+of East Timor
+of Ecuador
+of Egypt
+of El Salvador
 of England
+of Equatorial Guinea
+of Eritrea
+of Estonia
+of Ethiopia
+of Falkland Islands
+of Faroe Islands
+of Fiji
+of Finland
 of France
+of France
+of France (European Territory)
+of French Guyana
+of French Southern Territories
+of Gabon
+of Gambia
+of Georgia
+of Germany
+of Ghana
+of Gibraltar
+of Great Britain
+of Greece
+of Greenland
+of Grenada
+of Guadeloupe (French)
+of Guam (USA)
+of Guatemala
+of Guinea
+of Guinea Bissau
+of Guyana
+of Haiti
+of Heard and McDonald Islands
+of Honduras
+of Hong Kong
+of Hungary
+of Iceland
+of India
+of Indonesia
+of Iran
+of Iraq
 of Ireland
+of Ireland
+of Israel
+of Italy
+of Ivory Coast (Cote D`Ivoire)
+of Jamaica
+of Japan
+of Jordan
+of Kazakhstan
+of Kenya
+of Kiribati
+of Kuwait
+of Kyrgyzstan
+of Laos
+of Latvia
+of Lebanon
+of Lesotho
+of Liberia
+of Libya
+of Liechtenstein
+of Lithuania
 of Los Angeles
+of Luxembourg
+of Macau
+of Macedonia
+of Madagascar
+of Malawi
 of Malaysia
+of Malaysia
+of Maldives
+of Mali
+of Malta
+of Marshall Islands
+of Martinique (French)
+of Mauritania
+of Mauritius
+of Mayotte
+of Mexico
+of Micronesia
+of Moldavia
+of Monaco
+of Mongolia
+of Montserrat
+of Morocco
+of Mozambique
+of Myanmar
+of Namibia
+of Nauru
+of Nepal
+of Netherlands
+of Netherlands Antilles
+of Neutral Zone
+of New Caledonia (French)
 of New York City
 of New Zealand
+of New Zealand
+of Nicaragua
+of Niger
+of Nigeria
+of Niue
+of Norfolk Island
+of Northern Mariana Islands
+of North Korea
+of Norway
+of Oman
+of Pakistan
+of Palau
+of Panama
+of Papua New Guinea
+of Paraguay
 of Paris
 of Peru
+of Peru
+of Philippines
+of Pitcairn Island
+of Poland
+of Polynesia (French)
+of Portugal
+of Puerto Rico
+of Qatar
+of Reunion (French)
+of Romania
+of Russian Federation
+of Rwanda
+of Saint Helena
+of Saint Kitts & Nevis Anguilla
+of Saint Lucia
+of Saint Pierre and Miquelon
+of Saint Tome and Principe
+of Saint Vincent & Grenadines
+of Samoa
+of San Marino
+of Saudi Arabia
+of Senegal
+of Seychelles
+of S. Georgia & S. Sandwich Isls.
+of Sierra Leone
+of Singapore
+of Slovak Republic
+of Slovenia
+of Solomon Islands
+of Somalia
 of South Africa
+of South Africa
+of South Korea
+of Spain
+of Sri Lanka
+of Sudan
+of Suriname
+of Svalbard and Jan Mayen Islands
+of Swaziland
+of Sweden
+of Switzerland
+of Syria
+of Tadjikistan
+of Taiwan
+of Tanzania
+of Thailand
+of Togo
+of Tokelau
+of Tonga
+of Trinidad and Tobago
 of Troy
+of Tunisia
+of Turkey
+of Turkmenistan
+of Turks and Caicos Islands
 of Tuscon, Arizona
+of Tuvalu
+of Uganda
+of Ukraine
+of United Arab Emirates
+of United Kingdom
+of United States
+of Uruguay
+of USA Minor Outlying Islands
+of Uzbekistan
 of Vancouver
+of Vanuatu
+of Vatican City State
+of Venezuela
+of Vietnam
+of Virgin Islands (British)
+of Virgin Islands (USA)
 of Wales
+of Wallis and Futuna Islands
+of Western Sahara
+of Yemen
 of Yorkshire
+of Zaire
+of Zambia
+of Zimbabwe
 
 
 [POSTNOMINAL]
@@ -21477,8 +21738,15 @@ SEPARATOR: ,
 P: 0.10
 
 Attorney at Law
+DDO
+DDS
 Esquire
+LCSW
+NP
 PhD
+PI
+PRN
+RN
 
 # Rare
 [POSTNOMINAL]
@@ -21491,14 +21759,18 @@ Thief
 Witch
 Wizard
 Warlock
+Artificer
 
 # Very Rare
 [POSTNOMINAL]
 SEPARATOR: ,
-P: 0.005
+P: 0.0025
 
-Witch of Time
-Witch of The Worlds Heart
+Just a Little Guy
 Out of Time and Space
-
+Rogue Barista
+Voidcreature
+Who Was Once a Newt but Got Better
+Witch of The World's Heart
+Witch of Time
 
