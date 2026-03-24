@@ -132,8 +132,16 @@ func (api *Api) Setup() {
     nu.ReplyJson(thief)
   })
 
-  mux.Handle("GET /api/safehtml/tags", func(nu Nu) {
-    nu.ReplyJson(loot.SafeTags)
+  mux.Handle("GET /api/allowhtml/tags", func(nu Nu) {
+    nu.ReplyJson(loot.AllowTags)
+  })
+
+  mux.Handle("GET /api/denyhtml/attrs", func(nu Nu) {
+    nu.ReplyJson(loot.DenyAttributes)
+  })
+
+  mux.Handle("GET /api/denyhtml/attr-prefixes", func(nu Nu) {
+    nu.ReplyJson(loot.DenyAttrPrefixes)
   })
 
   mux.Handle("GET /api/name", func(nu Nu) {

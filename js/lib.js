@@ -154,7 +154,7 @@ DT.CleanCopyDOM = original => {
       return null;
   }
 
-  if (!DT.safeTags[original.tagName.toLocaleLowerCase()]) {
+  if (!DT.allowedTags[original.tagName.toLocaleLowerCase()]) {
     return null;
   }
 
@@ -162,16 +162,15 @@ DT.CleanCopyDOM = original => {
 
   for (const a of original.getAttributeNames()) {
     const name = a.toLocaleLowerCase();
-    if (name.startsWith("on")) {
+    if (DT.deniedAttrs[name]) {
       dom.removeAttribute(name);
       continue;
     }
-    if (name.startsWith("data-")) {
-      dom.removeAttribute(name);
-      continue;
-    }
-    if (name === 'href') {
-      dom.setAttribute('href', '#');
+    for (const prefix of DT.deniedAttrPrefixes) {
+      if (name.startsWith(prefix)) {
+        dom.removeAttribute(name);
+        continue;
+      }
     }
   }
 
@@ -925,7 +924,9 @@ DT.Offer = async (item) => {
 };
 
 DT.Initialize = async () => {
-  DT.safeTags = await DT.Fetch('/safehtml/tags').then(r => r.json());
+  DT.allowedTags = await DT.Fetch('/allowhtml/tags').then(r => r.json());
+  DT.deniedAttrs = await DT.Fetch('/denyhtml/attrs').then(r => r.json());
+  DT.deniedAttrPrefixes = await DT.Fetch('/denyhtml/attr-prefixes').then(r => r.json());
   DT.guild = 'global';
   DT.inventory = [];
   DT.thieves = [];

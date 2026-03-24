@@ -9,97 +9,100 @@ import (
   "strings"
 )
 
-var SafeTags = (func() map[string]bool {
-  m := map[string]bool{}
-  for _, s := range []string{
-    "a",
-    "abbr",
-    "acronym",
-    "area",
-    "aside",
-    "audio",
-    "b",
-    "bdi",
-    "bdo",
-    "big",
-    "blockquote",
-    "br",
-    "caption",
-    "center",
-    "cite",
-    "code",
-    "col",
-    "colgroup",
-    "dd",
-    "del",
-    "details",
-    "div",
-    "dl",
-    "em",
-    "figcaption",
-    "figure",
-    "font",
-    "footer",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "header",
-    "hgroup",
-    "hr",
-    "i",
-    "img",
-    "ins",
-    "label",
-    "legend",
-    "li",
-    "map",
-    "mark",
-    "marquee",
-    "math",
-    "menu",
-    "meter",
-    "nobr",
-    "ol",
-    "p",
-    "plaintext",
-    "pre",
-    "progress",
-    "q",
-    "rb",
-    "rp",
-    "rtc",
-    "ruby",
-    "s",
-    "samp",
-    "span",
-    "strike",
-    "strong",
-    "sub",
-    "summary",
-    "sup",
-    "svg",
-    "table",
-    "tbody",
-    "td",
-    "tfoot",
-    "th",
-    "thead",
-    "tr",
-    "track",
-    "tt",
-    "u",
-    "ul",
-    "video",
-    "wbr",
-    "xmp",
-  } {
-    m[s] = true
-  }
-  return m
-})()
+var DenyAttrPrefixes = []string{ "on", "data-", "hx-" }
+
+var DenyAttributes = mkset( 
+  "class",
+  "href",
+  "id",
+  "name",
+)
+
+var AllowTags = mkset(
+  "a",
+  "abbr",
+  "acronym",
+  "area",
+  "aside",
+  "audio",
+  "b",
+  "bdi",
+  "bdo",
+  "big",
+  "blockquote",
+  "br",
+  "caption",
+  "center",
+  "cite",
+  "code",
+  "col",
+  "colgroup",
+  "dd",
+  "del",
+  "details",
+  "div",
+  "dl",
+  "em",
+  "figcaption",
+  "figure",
+  "font",
+  "footer",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "header",
+  "hgroup",
+  "hr",
+  "i",
+  "img",
+  "ins",
+  "label",
+  "legend",
+  "li",
+  "map",
+  "mark",
+  "marquee",
+  "math",
+  "menu",
+  "meter",
+  "nobr",
+  "ol",
+  "p",
+  "plaintext",
+  "pre",
+  "progress",
+  "q",
+  "rb",
+  "rp",
+  "rtc",
+  "ruby",
+  "s",
+  "samp",
+  "span",
+  "strike",
+  "strong",
+  "sub",
+  "summary",
+  "sup",
+  "svg",
+  "table",
+  "tbody",
+  "td",
+  "tfoot",
+  "th",
+  "thead",
+  "tr",
+  "track",
+  "tt",
+  "u",
+  "ul",
+  "video",
+  "wbr",
+  "xmp",
+)
 
 type LootID string
 
@@ -175,17 +178,29 @@ func (loot *Loot) Validate() error {
 
 func checkElementNode(node *html.Node) error {
   tag := strings.ToLower(node.Data)
-  if !SafeTags[tag] {
+  if !AllowTags[tag] {
     return fmt.Errorf("400 dangerous tag %v", tag)
   }
   if node.Attr != nil {
     for _, a := range node.Attr {
       name := strings.ToLower(a.Key)
-      if strings.HasPrefix(name, "on") {
-        return fmt.Errorf("400 dangerous event listener %v", name)
+      if DenyAttributes[name] {
+        return fmt.Errorf("400 dangerous attribute %v", name)
+      }
+      for _, p := range DenyAttrPrefixes {
+        if strings.HasPrefix(name, p) {
+          return fmt.Errorf("400 dangerous event listener %v", name)
+        }
       }
     }
   }
   return nil
 }
 
+func mkset(arr ...string) map[string]bool {
+  m := map[string]bool{}
+  for _, s := range arr {
+    m[s] = true
+  }
+  return m
+}
