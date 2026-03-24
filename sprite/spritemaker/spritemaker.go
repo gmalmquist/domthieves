@@ -40,12 +40,14 @@ type SpriteMaker struct {
   ChromaKeyColor color.RGBA
   OutputFormat OutputFormat
   InputPaths []string
+  ImageOutputPath string
+  JsonOutputPath string
 }
 
 func Cli(args ...string) {
   mkr := SpriteMaker{}
   paths := []string{}
-  var outpath, flag string
+  var flag string
 
   fatal := func(code int, err any, args ...any) {
     if len(args) > 0 {
@@ -77,8 +79,13 @@ func Cli(args ...string) {
     f := flag
     flag = ""
     switch f {
+    case "out": fallthrough
     case "o":
-      outpath = a
+      mkr.ImageOutputPath = a
+      continue
+    case "json": fallthrough
+    case "j":
+      mkr.JsonOutputPath = a
       continue
     case "k":
       c, err := parseColor(a)
@@ -90,24 +97,29 @@ func Cli(args ...string) {
     }
     paths = append(paths, a)
   }
-  if outpath == "" {
+  if mkr.ImageOutputPath == "" {
     fatal(1, "missing output path")
   }
   mkr.InputPaths = paths
 
-  switch filepath.Ext(strings.ToLower(outpath)) {
+  imgExt := filepath.Ext(mkr.ImageOutputPath)
+  switch strings.ToLower(imgExt) {
   case ".png":
     mkr.OutputFormat = FormatPNG
   case ".gif":
     mkr.OutputFormat = FormatGIF
   }
+
+  if mkr.JsonOutputPath == "" {
+    mkr.JsonOutputPath = fmt.Sprintf("%v.json", strings.TrimPrefix(mkr.ImageOutputPath, imgExt))
+  }
   
-  mkr.WriteToFile(outpath)
+  mkr.WriteToFile()
 }
 
 
-func (mkr *SpriteMaker) WriteToFile(outpath string) error {
-  f, err := os.Create(outpath)
+func (mkr *SpriteMaker) WriteToFile() error {
+  f, err := os.Create(mkr.ImageOutputPath)
   if err != nil {
     return err
   }
@@ -120,10 +132,7 @@ func (mkr *SpriteMaker) Write(w io.Writer) error {
   fmt.Fprintf(os.Stderr, "  chroma-key-mode = %v\n", mkr.ChromaKeyMode)
   fmt.Fprintf(os.Stderr, "  chroma-key-color = %v,%v,%v\n",
     mkr.ChromaKeyColor.R, mkr.ChromaKeyColor.G, mkr.ChromaKeyColor.B)
-  fmt.Fprintf(os.Stderr, "  input sprites:\n")
-  for i, p := range mkr.InputPaths {
-    fmt.Fprintf(os.Stderr, "    %v. %v\n", i + 1, filepath.Base(p))
-  }
+  fmt.Fprintf(os.Stderr, "  sprites: %d\n", len(mkr.InputPaths))
 
   paths := mkr.InputPaths
 
@@ -221,6 +230,16 @@ func (mkr *SpriteMaker) Write(w io.Writer) error {
     return errors.New("No image data (empty sheet)")
   }
 
+  var namelen int
+  for _, s := range sprites {
+    if len(s.Name) > namelen {
+      namelen = len(s.Name)
+    }
+  }
+  nametmpl := fmt.Sprintf("%%-%ds", namelen)
+
+  var totalSpriteArea int
+
   sheet := image.NewRGBA(sheetsize)
   for i, sprite := range sprites {
     g := gifs[i]
@@ -239,7 +258,25 @@ func (mkr *SpriteMaker) Write(w io.Writer) error {
         draw.Src,
       )
     }
+
+    fmt.Fprintf(
+      os.Stderr,
+      "    %2d. %v → (%3d,%3d) to (%3d, %3d)\n",
+      i + 1,
+      fmt.Sprintf(nametmpl, sprite.Name),
+      sprite.FirstFrameX,
+      sprite.FirstFrameY,
+      sprite.FirstFrameX + spriteWidths[i],
+      sprite.FirstFrameY + sprite.FrameHeight,
+    )
+
+    totalSpriteArea += spriteWidths[i] * sprite.FrameHeight
   }
+
+  spritesheetArea := sheetsize.Max.X * sheetsize.Max.Y
+  fmt.Fprintf(os.Stderr, "  total sprite size: %d\n", totalSpriteArea)
+  fmt.Fprintf(os.Stderr, "  spritesheet size:  %d (%d × %d)\n", spritesheetArea, sheetsize.Max.X, sheetsize.Max.Y)
+  fmt.Fprintf(os.Stderr, "  compactness:       %d%%\n", 100 * totalSpriteArea / spritesheetArea)
 
   switch mkr.OutputFormat {
   case FormatPNG:
@@ -252,13 +289,24 @@ func (mkr *SpriteMaker) Write(w io.Writer) error {
   default:
     return fmt.Errorf("Unknown output format %v", mkr.OutputFormat)
   }
+  fmt.Fprintf(os.Stderr, "wrote spritesheet: %v\n", mkr.ImageOutputPath)
 
   blob, err := jsv.Marshal(sprites)
   if err != nil {
     return fmt.Errorf("failed to marshal json metadata for spritesheet: %v", err)
   }
 
-  fmt.Print(blob.String())
+  var jout io.Writer = os.Stdout
+  if mkr.JsonOutputPath != "" {
+    w, err := os.Create(mkr.JsonOutputPath)
+    if err != nil {
+      return fmt.Errorf("failed to create json metadata file '%v': %v", mkr.JsonOutputPath, err)
+    }
+    defer w.Close()
+    jout = w
+  }
+  fmt.Fprint(jout, blob.String())
+  fmt.Fprintf(os.Stderr, "wrote metadata:    %v\n", mkr.JsonOutputPath)
   return nil
 }
 
