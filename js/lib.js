@@ -329,6 +329,7 @@ DT.Recruit = async () => {
   const spriteblock = document.createElement('div');
   spriteblock.style.display = 'block';
   spriteblock.style.backgroundColor = 'rgba(0,0,0,0.25)';
+  spriteblock.style.imageRendering = 'pixelated';
   spriteblock.style.position = 'relative';
   spriteblock.style.overflow = 'hidden';
   spriteblock.style.width = `${size}px`;
