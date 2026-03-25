@@ -161,6 +161,13 @@ func (u *Nu) ReplyHTMLErr(code int, err any) {
   `, code, err)))
 }
 
+func (u *Nu) ReplyPlaintext(text string) {
+  u.w.Header().Add("Content-Type", "text/html; charset=utf-8")
+  data := []byte(text)
+  u.w.Header().Add("Content-Length", fmt.Sprintf("%v", len(data)))
+  u.w.Write(data)
+}
+
 func (u *Nu) CookieOr(key string, defaultValue string) string {
   value := defaultValue
   for _, c := range u.r.CookiesNamed(key) {

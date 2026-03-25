@@ -123,7 +123,7 @@ type Loot struct {
   DOM string `json:"dom"`
 
   // Name of the thief who stole this loot
-  StolenBy string `json:"tolen_by"`
+  StolenBy string `json:"stolen_by"`
 
   // What can this item be used for?
   Uses []string `json:"uses"`

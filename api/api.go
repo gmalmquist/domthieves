@@ -2,6 +2,7 @@ package api
 
 import (
   "domthieves/config"
+  "domthieves/jsv"
   "domthieves/loot"
   "domthieves/names"
   "domthieves/netutil"
@@ -14,6 +15,7 @@ import (
   "path/filepath"
   "strconv"
   "strings"
+  "io/ioutil"
 )
 
 const Version string = "0.0.1"
@@ -68,6 +70,10 @@ func (api *Api) Setup() {
     w.Header().Add("Content-Type", "application/javascript; charset=utf-8")
     w.Header().Add("Content-Length", fmt.Sprintf("%v", len(blob)))
     w.Write(blob)
+  })
+
+  mux.Handle("GET /api/server/maxrequestsize", func(nu Nu) {
+    nu.ReplyJson(config.Conf.MaxRequestSize)
   })
 
   mux.Handle("GET /api/guild/{gid}/thief/{tid}", func(nu Nu) {
@@ -130,6 +136,61 @@ func (api *Api) Setup() {
     thief := guild.Recruit(offer)
 
     nu.ReplyJson(thief)
+  })
+
+  mux.Handle("POST /api/guild/{gid}/return/{tid}", func(nu Nu) {
+    _, r := nu.Unwrap()
+    gid := thief.GuildID(r.PathValue("gid"))
+    tid := thief.ThiefID(r.PathValue("tid"))
+    
+    guild, ok := api.Guilds.Guild(gid)
+    if !ok {
+      nu.ReplyErr(404, "No guild is chartered as '%v'", gid)
+      return
+    }
+
+    guild.Return(tid)
+    nu.ReplyPlaintext("welcome home! :)")
+  })
+
+  mux.Handle("POST /api/guild/{gid}/deposit", func(nu Nu) {
+    w, r := nu.Unwrap()
+
+    body, err := ioutil.ReadAll(http.MaxBytesReader(w, r.Body, config.Conf.MaxRequestSize))
+    if err != nil {
+      nu.ReplyErr(413, "too big (%v)", err)
+      return
+    }
+
+    var item loot.Loot
+    err = jsv.JsonValue(body).Unmarshal(&item)
+    if err != nil {
+      nu.ReplyErr(400, err, "couldn't parse request body json: %v", err)
+      return
+    }
+
+    if (item.Name == "") {
+      nu.ReplyErr(400, "missing name")
+      return
+    }
+
+    if (item.DOM == "") {
+      nu.ReplyErr(400, "missing dom")
+      return
+    }
+
+    if (item.StolenBy == "") {
+      nu.ReplyErr(400, "missing stolen by")
+      return
+    }
+
+    if (item.Uses == nil || len(item.Uses) == 0) {
+      nu.ReplyErr(400, "missing uses")
+    }
+
+    if (item.ID == loot.LootID("")) {
+      item.ID = loot.NewID()
+    }
   })
 
   mux.Handle("GET /api/allowhtml/tags", func(nu Nu) {

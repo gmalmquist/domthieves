@@ -5,6 +5,7 @@ const ALREADY_ASSESSED = 'already_stolen';
 const USELESS = 'useless';
 const ILLEGAL_TAG = 'illegal_tag';
 const HIDDEN = 'hidden';
+const SACK_FULL = 'sack is full';
 
 DT.ApiRoot = 'https://domthieves.gwen.run/api';
 
@@ -25,6 +26,10 @@ DT.AssessLoot = (loot) => {
   for (const dom of loot) {
     const item = DT.AssessLootItem(dom);
     if (typeof item === 'string') {
+      continue;
+    }
+    if (item.size > DT.maxRequestSize) {
+      dom.dataset.lootTooBig = "true";
       continue;
     }
     DT.inventory.push(item);
@@ -101,10 +106,12 @@ DT.AssessLootItem = dom => {
     price: 0,
   };
 
+  const size = JSON.stringify(item).length;
   return {
     item,
     dom,
     uses,
+    size,
   };
 };
 
@@ -309,6 +316,8 @@ DT.Recruit = async () => {
     node: null,
     speed: 16.0,
     anim: null,
+    sack: [],
+    sackSize: 0,
   };
 
   let size = 32; // ??
@@ -663,10 +672,22 @@ DT.Recruit = async () => {
   };
 
   thief.take = item => {
+    if (item.size + thief.sackSize >= DT.maxRequestSize) {
+      return 
+    }
     thief.addTask(thief.showNametag());
     thief.walkTo(item);
     thief.addTask(thief.hideNametag());
     thief.addTask(thief.newTask('taking', (dt) => {
+      if (item.dom.dataset.lootStolen) {
+        // already stolen
+        console.log(item.item.name, 'was already stolen');
+        return
+      }
+      if (thief.sackSize + item.size > DT.maxRequestSize) {
+        console.log('no room for', item.size);
+        return;
+      }
       if (thief.anim.lastPlayed === 'stand-l' || thief.anim.lastPlayed === 'walk-l') {
         thief.play('reach-l');
       } else if (thief.anim.lastPlayed === 'stand-r' || thief.anim.lastPlayed === 'walk-r') {
@@ -695,7 +716,8 @@ DT.Recruit = async () => {
           el.style.display = 'none';
           el.remove();
           thief.play('stand-f');
-          // TODO: send to server! we got it!
+          thief.sack.push(item.item);
+          thief.sackSize = thief.sack.map(item => item.size).reduce((a, b) => a + b, 0);
         }, 500);
       }, 10);
     }));
@@ -728,6 +750,47 @@ DT.Recruit = async () => {
       return isSome(thief.anim) && !isEmpty(thief.anim.playing);
     }));
   };
+
+  const returnToGuild = async () => {
+    for (const item of thief.sack) {
+      const payload = JSON.stringify(item.item);
+      const r = await DT.Fetch(`/guild/${thief.meta.guild}/deposit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: payload,
+      });
+      if (!r.ok) {
+        const reason = await r.text();
+        console.error(`failed to deposit ${item.item.name}: ${r.status} ${r.statusText} ${reason}`);
+      }
+    }
+    const r = await DT.Fetch(`/guild/${thief.meta.guild}/return/${thief.meta.id}`, {
+      method: 'POST',
+    });
+    if (!r.ok) {
+      console.error(`unable to return thief ${thief.meta.name} home to guild ${thief.meta.guild}`);
+      return;
+    }
+    console.log(`${thief.meta.name} returned home: ${await r.text()}`);
+  };
+
+  thief.leave = () => {
+    thief.addAnimTask('abscond');
+    thief.addTask(thief.newTask('absconding', () => {
+      DT.thieves = DT.thieves.filter(t => t.meta.id !== thief.meta.id);
+      if (isSome(thief.anim)) {
+        thief.anim.playing = '';
+      }
+      clearInterval(thief.taskLoop);
+      thief.node.remove();
+      setTimeout(() => {
+        returnToGuild();
+      },1);
+      return false;
+    }));
+  }
 
   const delay = 20;
   const dt = (delay / 1000.0);
@@ -801,6 +864,35 @@ DT.FetchSpritesheet = async (url) => {
     return null;
   }
 
+  const reversed = (arr) => {
+    if (isNone(arr)) {
+      return arr;
+    }
+    const rev = new Array(arr.length);
+    for (let i = 0; i < arr.length; i++) {
+      rev[arr.length - i - 1] = arr[i];
+    }
+    return rev;
+  };
+
+  for (const sprite of Object.values(spritesheet.sprite_map)) {
+    sprite.play_direction = isSome(sprite.play_direction) ? sprite.play_direction : 1;
+  }
+
+  if (isNone(spritesheet.sprite_map['abscond'])) {
+    // default to abscond being equal to the reverse of appear
+    const appear = spritesheet.sprite_map['appear'];
+    const abscond = {
+      ...appear,
+      name: 'abscond',
+      delay_milli: reversed(appear.delay_milli),
+      distance_moved_per_frame: reversed(appear.distance_moved_per_frame),
+      first_frame_x: appear.first_frame_x + appear.frame_width * (appear.frame_count - 1),
+      play_direction: -appear.play_direction,
+    };
+    spritesheet.sprite_map['abscond'] = abscond;
+  }
+
   const spriteview = document.createElement('div');
   spriteview.style.position = 'absolute';
   spriteview.style.display = 'block';
@@ -844,7 +936,8 @@ DT.FetchSpritesheet = async (url) => {
     if (anim.frameIndex >= sprite.frame_count) {
       anim.frameIndex = 0;
     }
-    anim.spriteview.style.backgroundPosition = `${-sprite.first_frame_x - sprite.frame_width * anim.frameIndex}px ${-sprite.first_frame_y}px`;
+    const offsetX = -sprite.first_frame_x - (sprite.frame_width * anim.frameIndex * sprite.play_direction);
+    anim.spriteview.style.backgroundPosition = `${offsetX}px ${-sprite.first_frame_y}px`;
 
     const tick = {
       animation: sprite.name,
@@ -917,8 +1010,9 @@ DT.Offer = async (item) => {
     return;
   }
   for (const thief of DT.thieves) {
-    thief.take(item);
-    return;
+    if (thief.take(item) !== SACK_FULL) {
+      return;
+    }
   }
   const thief = await DT.Recruit();
   thief.take(item);
@@ -928,6 +1022,7 @@ DT.Initialize = async () => {
   DT.allowedTags = await DT.Fetch('/allowhtml/tags').then(r => r.json());
   DT.deniedAttrs = await DT.Fetch('/denyhtml/attrs').then(r => r.json());
   DT.deniedAttrPrefixes = await DT.Fetch('/denyhtml/attr-prefixes').then(r => r.json());
+  DT.maxRequestSize = await DT.Fetch('/server/maxrequestsize').then(r => r.json());
   DT.guild = 'global';
   DT.inventory = [];
   DT.thieves = [];

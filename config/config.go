@@ -11,6 +11,7 @@ type Config struct {
   DataRoot string
   DefaultCulture string
   DefaultThiefSpritesheets []string
+  MaxRequestSize int64
 }
 
 func Default() *Config {
@@ -20,6 +21,7 @@ func Default() *Config {
     DefaultThiefSpritesheets: []string{
       "https://domthieves.gwen.run/img/sprites/thief-pirate01.json",
     },
+    MaxRequestSize: 1024 * 128,
   }
 }
 
