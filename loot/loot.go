@@ -3,6 +3,7 @@ package loot
 import (
   "github.com/google/uuid"
   "golang.org/x/net/html"
+  "golang.org/x/net/html/atom"
 
   "bytes"
   "fmt"
@@ -105,6 +106,7 @@ var AllowTags = mkset(
 )
 
 type LootID string
+type Use string
 
 func NewID() LootID {
   return LootID(uuid.NewString())
@@ -126,10 +128,10 @@ type Loot struct {
   StolenBy string `json:"stolen_by"`
 
   // What can this item be used for?
-  Uses []string `json:"uses"`
+  Uses []Use `json:"uses"`
 
   // What was this item originally used for?
-  OriginalUse string `json:"original_use"`
+  OriginalUse Use `json:"original_use"`
 
   // What website did this item come from?
   Home string `json:"home"`
@@ -157,7 +159,11 @@ func NewSack() *Sack {
 // work.
 func (loot *Loot) Validate() error {
   is := bytes.NewBuffer([]byte(loot.DOM))
-  docs, err := html.ParseFragment(is, nil)
+  docs, err := html.ParseFragment(is, &html.Node{
+    Type: html.ElementNode,
+    DataAtom: atom.Body,
+    Data: "body",
+  })
   if err != nil {
     return fmt.Errorf("400 bad HTML: %v", err)
   }

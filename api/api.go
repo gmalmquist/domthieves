@@ -9,6 +9,8 @@ import (
   "domthieves/storeutil"
   "domthieves/thief"
 
+  "github.com/google/uuid"
+
   "fmt"
   "net/http"
   "os"
@@ -76,6 +78,10 @@ func (api *Api) Setup() {
     nu.ReplyJson(config.Conf.MaxRequestSize)
   })
 
+  mux.Handle("GET /api/server/uuid", func(nu Nu) {
+    nu.ReplyPlaintext(uuid.NewString())
+  })
+
   mux.Handle("GET /api/guild/{gid}/thief/{tid}", func(nu Nu) {
     _, r := nu.Unwrap()
     gid := thief.GuildID(r.PathValue("gid"))
@@ -94,6 +100,21 @@ func (api *Api) Setup() {
     }
 
     nu.ReplyJson(thief)
+  })
+
+  mux.Handle("GET /api/guild/{gid}", func(nu Nu) {
+    w, r := nu.Unwrap()
+    gid := thief.GuildID(r.PathValue("gid"))
+    
+    guild, ok := api.Guilds.Guild(gid)
+    if !ok {
+      nu.ReplyErr(404, "No guild is chartered as '%v'", gid)
+      return
+    }
+
+    blob := guild.Json()
+    w.Header().Add("Content-Type", "application/json")
+    w.Write(blob)
   })
 
   mux.Handle("GET /api/guild/{gid}/active", func(nu Nu) {
@@ -156,6 +177,13 @@ func (api *Api) Setup() {
   mux.Handle("POST /api/guild/{gid}/deposit", func(nu Nu) {
     w, r := nu.Unwrap()
 
+    gid := thief.GuildID(r.PathValue("gid"))
+    guild, ok := api.Guilds.Guild(gid)
+    if !ok {
+      nu.ReplyErr(404, "No guild is chartered as '%v'", gid)
+      return
+    }
+
     body, err := ioutil.ReadAll(http.MaxBytesReader(w, r.Body, config.Conf.MaxRequestSize))
     if err != nil {
       nu.ReplyErr(413, "too big (%v)", err)
@@ -191,6 +219,17 @@ func (api *Api) Setup() {
     if (item.ID == loot.LootID("")) {
       item.ID = loot.NewID()
     }
+
+    if err = item.Validate(); err != nil {
+      nu.ReplyErr(400, err)
+      return
+    }
+
+    if err = guild.Deposit(&item); err != nil {
+      nu.ReplyErr(400, err)
+      return
+    }
+    nu.ReplyPlaintext("ok");
   })
 
   mux.Handle("GET /api/allowhtml/tags", func(nu Nu) {

@@ -2,6 +2,8 @@ package thief
 
 import (
   "domthieves/config"
+  "domthieves/jsv"
+  "domthieves/loot"
   "domthieves/names"
 
   "github.com/gammazero/deque"
@@ -12,6 +14,7 @@ import (
 )
 
 import (
+  "errors"
   "sync"
 )
 
@@ -26,10 +29,16 @@ type Guild struct {
   Websites map[string]bool `json:"websites"`
   Spritesheets []string `json:"spritesheets"`
   Culture string `json:"culture"`
+  Thieves map[ThiefID]*Thief `json:"thieves"`
+  Loot *LootTable `json:"loot"`
   namegen *names.NameGen `json:"-"`
-  thieves map[ThiefID]*Thief `json:"thieves"`
   idle deque.Deque[*Thief] `json:"-"`
   lock *sync.RWMutex `json:"-"`
+}
+
+type LootTable struct {
+  Items map[loot.LootID]*loot.Loot `json:"loot"`
+  uses map[loot.Use][]loot.LootID `json:"loot_by_use"`
 }
 
 func NewGuild(namegen *names.NameGen) *Guild {
@@ -37,9 +46,17 @@ func NewGuild(namegen *names.NameGen) *Guild {
     ID: NewGuildID(),
     Websites: map[string]bool{},
     Spritesheets: []string{},
+    Thieves: map[ThiefID]*Thief{},
+    Loot: NewLootTable(),
     namegen: namegen,
-    thieves: map[ThiefID]*Thief{},
     lock: &sync.RWMutex{},
+  }
+}
+
+func NewLootTable() *LootTable {
+  return &LootTable{
+    Items: map[loot.LootID]*loot.Loot{},
+    uses: map[loot.Use][]loot.LootID{},
   }
 }
 
@@ -58,7 +75,7 @@ func (g *Guild) ListActive() ([]*Thief) {
   arr := []*Thief{}
   g.lock.RLock()
   defer g.lock.RUnlock()
-  for _, thief := range g.thieves {
+  for _, thief := range g.Thieves {
     if thief.Employer != "" {
       arr = append(arr, thief)
     }
@@ -69,7 +86,7 @@ func (g *Guild) ListActive() ([]*Thief) {
 func (g *Guild) Thief(tid ThiefID) (*Thief, bool) {
   g.lock.RLock()
   defer g.lock.RUnlock()
-  thief, ok := g.thieves[tid]
+  thief, ok := g.Thieves[tid]
   return thief, ok
 }
 
@@ -111,14 +128,14 @@ func (g *Guild) Recruit(offer JobOffer) *Thief {
   thief.RecruitedAt = now.Format(time.RFC3339)
   thief.LastTaskAt = now.Format(time.RFC3339)
 
-  g.thieves[thief.ID] = thief
+  g.Thieves[thief.ID] = thief
   return thief
 }
 
 func (g *Guild) Return(tid ThiefID) {
   g.lock.Lock()
   defer g.lock.Unlock()
-  thief, ok := g.thieves[tid]
+  thief, ok := g.Thieves[tid]
   if !ok {
     return
   }
@@ -127,6 +144,53 @@ func (g *Guild) Return(tid ThiefID) {
   thief.RecruitedAt = ""
   thief.LastTaskAt = ""
   g.idle.PushBack(thief)
+}
+
+func (g *Guild) Deposit(item *loot.Loot) error {
+  if (item.ID == loot.LootID("")) {
+    item.ID = loot.NewID()
+  }
+  if item.Price <= 0 {
+    item.Price = 1
+  }
+
+  uses := map[loot.Use]bool{}
+  if item.OriginalUse != loot.Use("") {
+    uses[item.OriginalUse] = true
+  }
+  if item.Uses != nil {
+    for _, u := range item.Uses {
+      uses[u] = true
+    }
+  }
+
+  if len(uses) == 0 {
+    // useless item
+    return errors.New("useless")
+  }
+
+  g.lock.Lock()
+  defer g.lock.Unlock()
+
+  table := g.Loot
+  table.Items[item.ID] = item
+
+  for use, _ := range uses {
+    arr, ok := table.uses[use]
+    if !ok {
+      table.uses[use] = []loot.LootID{ item.ID }
+    } else {
+      table.uses[use] = append(arr, item.ID)
+    }
+  }
+  return nil
+}
+
+func (g *Guild) Json() []byte {
+  g.lock.RLock()
+  defer g.lock.RUnlock()
+  b, _ := jsv.Marshal(g)
+  return b
 }
 
 type Directory struct {
@@ -154,4 +218,3 @@ func (d *Directory) Guild(id GuildID) (*Guild, bool) {
   g, ok := d.guilds[id]
   return g, ok
 }
-

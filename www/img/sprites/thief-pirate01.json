@@ -86,6 +86,7 @@
     },
     "stand-f": {
       "name": "stand-f",
+      "kinds": ["idle"],
       "frame_width": 16,
       "frame_height": 32,
       "first_frame_x": 48,
@@ -105,6 +106,7 @@
     },
     "stand-l": {
       "name": "stand-l",
+      "kinds": ["idle"],
       "frame_width": 16,
       "frame_height": 32,
       "first_frame_x": 80,
@@ -124,6 +126,7 @@
     },
     "stand-r": {
       "name": "stand-r",
+      "kinds": ["idle"],
       "frame_width": 16,
       "frame_height": 32,
       "first_frame_x": 112,

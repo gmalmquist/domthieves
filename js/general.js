@@ -60,3 +60,18 @@ function parseCookies() {
   }
   return map;
 }
+
+function dedup(arr, keyfunc) {
+  const set = new Set();
+  const res = [];
+  for (const a of arr) {
+    let k = isSome(keyfunc) ? keyfunc(a) : a;
+    if (set.has(k)) {
+      continue;
+    }
+    set.add(k);
+    res.push(a);
+  }
+  return res;
+}
+

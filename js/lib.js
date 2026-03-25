@@ -16,10 +16,38 @@ DT.Fetch = async (path, args) => {
   return await fetch(`${DT.ApiRoot}${path}`, args);
 };
 
+DT.ForEachLootItem = async (callback) => {
+  const selectors = [
+    '[data-loot]',
+    '[data-loot-kind]',
+  ];
+  for (const sel of selectors) {
+    for (const dom of document.querySelectorAll(sel)) {
+      if (dom.dataset.lootStolen) {
+        continue;
+      }
+      if (dom.dataset.lootPhantom) {
+        continue;
+      }
+      const item = DT.AssessLootItem(dom);
+      if (isNone(item)) {
+        continue;
+      }
+      if (typeof item === 'string') {
+        continue;
+      }
+      if (isNone(item.dom.dataset.lootID)) {
+        const id = await DT.Fetch('/server/uuid').then(r => r.text());
+        item.dom.dataset.lootID = id;
+      }
+      callback(item);
+    }
+  }
+};
+
 DT.FindLoot = () => {
   DT.AssessLoot(document.querySelectorAll('[data-loot]'));
-  DT.AssessLoot(document.querySelectorAll('[data-loot-use]'));
-  DT.AssessLoot(document.querySelectorAll('[data-loot-uses]'));
+  DT.AssessLoot(document.querySelectorAll('[data-loot-kind]'));
 };
 
 DT.AssessLoot = (loot) => {
@@ -52,31 +80,29 @@ DT.AssessLootItem = dom => {
   }
 
   const tagName = dom.tagName.toLocaleLowerCase();
-  const uses = new Set([tagName]);
 
-  if (isSome(dom.dataset.loot)) {
-    uses.add(dom.dataset.loot);
-  }
-
-  if (isSome(dom.dataset.lootUse)) {
-    uses.add(dom.dataset.lootUse);
-  }
-
-  if (isSome(dom.dataset.lootUses)) {
-    dom.dataset.lootUses.trim().split(/\s+/)
+  const allKinds = [];
+  if (isSome(dom.dataset.lootKind)) {
+    dom.dataset.lootKind.trim().split(/\s+/)
       .filter(u => u.length > 0)
       .map(u => u.toLocaleLowerCase())
-      .forEach(u => uses.add(u));
+      .forEach(kind => allKinds.push(kind));
   }
+  if (!isEmpty(dom.dataset.loot)) {
+    allKinds.push(dom.dataset.loot);
+  }
+  allKinds.push(tagName);
 
   const uft = DT.UsesFromTag(tagName);
   if (typeof uft === 'string') {
-    uses.add(uft);
+    allKinds.push(uft);
   } else if (Array.isArray(uft)) {
-    uft.forEach(u => uses.add(u));
+    uft.forEach(u => allKinds.push(u));
   }
 
-  if (uses.size === 0) {
+  const uses = dedup(allKinds);
+
+  if (uses.length === 0) {
     return USELESS;
   }
 
@@ -92,15 +118,13 @@ DT.AssessLootItem = dom => {
     id: '',
     name: firstNotEmpty(
       dom.dataset.loot,
-      dom.dataset.lootName,
-      tagName,
+      ...uses,
     ),
     dom: wrap.innerHTML,
     stolen_by: '',
-    uses: Array.from(uses),
+    uses,
     original_use: firstNotEmpty(
-      dom.dataset.lootUses,
-      tagName,
+      ...uses,
     ),
     home: window.location.origin,
     price: 0,
@@ -110,7 +134,7 @@ DT.AssessLootItem = dom => {
   return {
     item,
     dom,
-    uses,
+    uses: new Set(uses),
     size,
   };
 };
@@ -716,6 +740,7 @@ DT.Recruit = async () => {
           el.style.display = 'none';
           el.remove();
           thief.play('stand-f');
+          item.item.stolen_by = thief.meta.name;
           thief.sack.push(item.item);
           thief.sackSize = thief.sack.map(item => item.size).reduce((a, b) => a + b, 0);
         }, 500);
@@ -728,7 +753,8 @@ DT.Recruit = async () => {
     if (isNone(thief.anim)) {
       return;
     }
-    if (thief.anim.playing === animation) {
+    const playing = thief.anim.spritesheet.sprite_map[thief.anim.playing];
+    if (isSome(playing) && playing.kinds.some(k => k === animation)) {
       return;
     }
     if (isSome(listener)) {
@@ -736,15 +762,14 @@ DT.Recruit = async () => {
         return listener(tick);
       });
     }
-    thief.anim.play(animation);
+    thief.anim.playKind(animation, true);
   };
 
   thief.addAnimTask = (animation) => {
     if (isNone(thief.anim)) {
       return;
     }
-    console.log('task: play', animation);
-    thief.anim.play(animation);
+    thief.anim.play(animation, true);
     thief.anim.stop();
     thief.addTask(thief.newTask(animation, dt => {
       return isSome(thief.anim) && !isEmpty(thief.anim.playing);
@@ -753,7 +778,7 @@ DT.Recruit = async () => {
 
   const returnToGuild = async () => {
     for (const item of thief.sack) {
-      const payload = JSON.stringify(item.item);
+      const payload = JSON.stringify(item);
       const r = await DT.Fetch(`/guild/${thief.meta.guild}/deposit`, {
         method: 'POST',
         headers: {
@@ -763,7 +788,7 @@ DT.Recruit = async () => {
       });
       if (!r.ok) {
         const reason = await r.text();
-        console.error(`failed to deposit ${item.item.name}: ${r.status} ${r.statusText} ${reason}`);
+        console.error(`failed to deposit ${item.name}: ${r.status} ${r.statusText} ${reason}`);
       }
     }
     const r = await DT.Fetch(`/guild/${thief.meta.guild}/return/${thief.meta.id}`, {
@@ -776,7 +801,7 @@ DT.Recruit = async () => {
     console.log(`${thief.meta.name} returned home: ${await r.text()}`);
   };
 
-  thief.leave = () => {
+  thief.abscond = () => {
     thief.addAnimTask('abscond');
     thief.addTask(thief.newTask('absconding', () => {
       DT.thieves = DT.thieves.filter(t => t.meta.id !== thief.meta.id);
@@ -791,6 +816,69 @@ DT.Recruit = async () => {
       return false;
     }));
   }
+
+  const consideredItems = {};
+  thief.survey = async () => {
+    if (thief.sack.length >= 3) {
+      // we got enough stuff tbh
+      console.log(thief.meta.name, 'absconded with a full sack of loot.');
+      thief.abscond();
+      return;
+    }
+
+    const list = [];
+    await DT.ForEachLootItem(item => {
+      const id = item.dom.dataset.lootID;
+      if (isNone(id) || consideredItems[id]) {
+        return;
+      }
+      list.push(item);
+    });
+
+    if (list.length === 0) {
+      console.log(thief.meta.name, 'could not find anything more to steal.');
+      thief.abscond();
+      return;
+    }
+
+    const item = list[Math.floor(Math.random() * list.length)];
+    consideredItems[item.dom.dataset.lootID] = true;
+
+    console.log(thief.meta.name, 'is taking a look-see at', item.item.name);
+
+    thief.walkTo(item);
+    thief.addTask(thief.newTask('appraising', () => {
+      if (item.size > DT.maxRequestSize) {
+        // too big!
+        console.log(item.item.name, 'is too big to steal.');
+        return;
+      }
+
+      console.log('taking', item.item.name);
+      thief.take(item);
+    }));
+  };
+
+  const freeTime = () => {
+    const minDelayMilli = DT.idleDelay;
+    const now = performance.now();
+    if (isSome(thief.lastFreeAction) && now - thief.lastFreeAction < minDelayMilli) {
+      return;
+    }
+    thief.lastFreeAction = now;
+
+    const choice = Math.random() * 100;
+    if (choice < 50) {
+      return;
+    }
+
+    thief.addTask(thief.showNametag());
+    if (choice < 75) {
+      thief.addAnimTask('idle');
+      return;
+    }
+    thief.survey();
+  };
 
   const delay = 20;
   const dt = (delay / 1000.0);
@@ -811,9 +899,10 @@ DT.Recruit = async () => {
       if (queue.length > 0) {
         const [ next ] = queue.splice(0, 1);
         thief.task = next;
-        console.log('start', thief.task.name);
         next.start();
+        return;
       }
+      freeTime();
       return;
     }
     if (isNone(task.frame)) {
@@ -828,7 +917,12 @@ DT.Recruit = async () => {
     }
   }, delay);
 
-  thief.moveTo(window.innerWidth/2, window.innerHeight/2);
+  const viewport = Geom.viewport();
+
+  thief.moveTo(
+    viewport.x + Math.random() * viewport.width,
+    viewport.y + Math.random() * viewport.height,
+  );
   thief.asyncTask(thief.showNametag());
 
   thief.addAnimTask('appear');
@@ -875,8 +969,30 @@ DT.FetchSpritesheet = async (url) => {
     return rev;
   };
 
+  spritesheet.kinds = {};
+
   for (const sprite of Object.values(spritesheet.sprite_map)) {
-    sprite.play_direction = isSome(sprite.play_direction) ? sprite.play_direction : 1;
+    // default to scanning sprites left to right
+    if (isNone(sprite.play_direction)) {
+      sprite.play_direction = 1;
+    }
+
+    // if a kind isn't specified, just use the name (basically
+    // creates a unique kind)
+    if (isEmpty(sprite.kinds)) {
+      sprite.kinds = [ sprite.name ];
+    }
+    if (!sprite.kinds.some(k => k === sprite.name)) {
+      sprite.kinds.push(sprite.name);
+    }
+    for (const kind of sprite.kinds) {
+      let arr = spritesheet.kinds[kind];
+      if (isEmpty(arr)) {
+        arr = [];
+      }
+      arr.push(sprite.name);
+      spritesheet.kinds[kind] = arr;
+    }
   }
 
   if (isNone(spritesheet.sprite_map['abscond'])) {
@@ -914,6 +1030,26 @@ DT.FetchSpritesheet = async (url) => {
     finishCallbacks: [],
   };
 
+  anim.playKind = (kind, interrupt) => {
+    if (isSome(anim.playing)) {
+      if (!interrupt) {
+        return false;
+      }
+      const sprite = anim.spritesheet.sprite_map[anim.playing];
+      if (isSome(sprite) && sprite.kinds.some(k => k === kind)) {
+        return false;
+      }
+      anim.stop();
+    }
+    const options = anim.spritesheet.kinds[kind];
+    if (isEmpty(options)) {
+      return false;
+    }
+    const animation = options[Math.floor(Math.random() * options.length)];
+    anim.play(animation);
+    return true;
+  };
+
   anim.play = (name) => {
     const first = !isEmpty(name) && name !== anim.playing;
     const sprite = !isEmpty(name) ? spritesheet.sprite_map[name] : spritesheet.sprite_map[anim.playing];
@@ -922,7 +1058,7 @@ DT.FetchSpritesheet = async (url) => {
         anim.stop();
         return;
       }
-      anim._finish(sprite.name);
+      anim._finish(name);
       return;
     }
     anim.playing = sprite.name;
@@ -1023,9 +1159,24 @@ DT.Initialize = async () => {
   DT.deniedAttrs = await DT.Fetch('/denyhtml/attrs').then(r => r.json());
   DT.deniedAttrPrefixes = await DT.Fetch('/denyhtml/attr-prefixes').then(r => r.json());
   DT.maxRequestSize = await DT.Fetch('/server/maxrequestsize').then(r => r.json());
+  DT.idleDelay = 500;
   DT.guild = 'global';
   DT.inventory = [];
   DT.thieves = [];
+
+  DT._surveyInt = setInterval(async () => {
+    if (DT.thieves.length === 0) {
+      const list = [];
+      await DT.ForEachLootItem(item => {
+        list.push(item);
+      });
+      if (list.length === 0) {
+        clearInterval(DT._surveyInt);
+        return;
+      }
+      DT.Recruit();
+    }
+  }, 1000);
 };
 
 setTimeout(DT.Initialize, 500);

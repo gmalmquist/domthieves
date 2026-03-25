@@ -5,7 +5,7 @@
   <title>⎽⎼⎻⎽⎼⎻⎽⎼⎻ DOM THIEVES ⎽⎼⎻⎽⎼⎻⎽⎼⎻</title>
   <script src="/domthieves.js"></script>
   <style>
-    [data-loot-use] > p {
+    [data-loot] > p {
       color: blue;
     }
     .dt-thief {
@@ -17,12 +17,12 @@
   </style>
 </head>
 <body>
-  <h1 data-loot-use="heading">DOM THIEVES</h1>
-  <hr data-loot="+1 ruler of smiting">
-  <div data-loot-use="deco">
+  <h1 data-loot-kind="heading">DOM THIEVES</h1>
+  <hr data-loot="+1 ruler of smiting" data-loot-kind="ruler">
+  <div data-loot-kind="deco">
     Hi there this is some text.
     <hr/> 
-    <p onclick="alert('hi')">What <i data-loot-use="is">is</i> up?</p>
+    <p onclick="alert('hi')">What <i data-loot="is" data-loot-kind="word">is</i> up?</p>
     <script>console.log('heyy');</script>
   </div>
 

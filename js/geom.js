@@ -35,12 +35,38 @@ Geom.cloneRect = function(rect) {
   return clone;
 }
 
+Geom.min = function(...args) {
+  let min = null;
+  for (const a of args) {
+    if (isNone(a)) {
+      continue;
+    }
+    if (isNone(min) || a < min) {
+      min = a;
+    }
+  }
+  return min;
+}
+
+Geom.max = function(...args) {
+  let max = null;
+  for (const a of args) {
+    if (isNone(a)) {
+      continue;
+    }
+    if (isNone(max) || a > max) {
+      max = a;
+    }
+  }
+  return max;
+}
+
 Geom.viewport = function() {
   const v = {
     x: window.scrollX,
     y: window.scrollY,
-    width: window.innerWidth,
-    height: window.innerHeight,
+    width: Geom.min(document.body.clientWidth, window.innerWidth),
+    height: Geom.min(document.body.clientHeight, window.innerHeight),
   };
   v.left = v.x;
   v.right = v.x + v.width;
