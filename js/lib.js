@@ -39,6 +39,7 @@ DT.Anim.TakeElement = async (element, target, args) => {
       scale(${scale})
       translate(${-d.x}px, ${d.y}px)
     `;
+    console.log(element.style.transform, target, centroid, d);
   };
   
   setTransform('0deg', 1.0);
@@ -758,33 +759,12 @@ DT.Recruit = async () => {
         thief.play('reach-r');
       }
       const el = DT.Pirate(item);
-      el.style.transitionProperty = 'transform';
-      el.style.transitionDuration = '0.5s';
-      el.style.transformOrigin = "center";
-      
-      const rect = Geom.getDocumentBoundingRect(el);
-      const elcx = rect.left/2 + rect.right/2;
-      const elcy = rect.top/2 + rect.bottom/2;
-
-      const thiefr = Geom.getDocumentBoundingRect(spriteblock);
-      const handx = thiefr.left/2 + thiefr.right/2;
-      const handy = thiefr.top/2 + thiefr.bottom/2;
-      
-      const dx = handx - elcx;
-      const dy = handy - elcy;
-
-      el.style.transform = `translate(${dx}px, ${dy}px) rotate(0deg) scale(1.0) translate(${-dx}px, ${dy}px)`;
-      setTimeout(() => {
-        el.style.transform = `translate(${dx}px, ${dy}px) rotate(135deg) scale(0.01) translate(${-dx}px, ${dy}px)`;
-        setTimeout(() => {
-          el.style.display = 'none';
-          el.remove();
-          thief.play('stand-f');
-          item.item.stolen_by = thief.meta.name;
-          thief.sack.push(item.item);
-          thief.sackSize = thief.sack.map(item => item.size).reduce((a, b) => a + b, 0);
-        }, 500);
-      }, 10);
+      setTimeout(() => DT.Anim.TakeElement(el, ['centroid', spriteblock], { remove: true }).then(() => {
+        thief.play('stand-f');
+        item.item.stolen_by = thief.meta.name;
+        thief.sack.push(item.item);
+        thief.sackSize = thief.sack.map(item => item.size).reduce((a, b) => a + b, 0);
+      }));
     }));
     thief.addTask(thief.showNametag());
   };

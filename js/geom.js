@@ -116,7 +116,9 @@ Geom.point = (spec) => {
         y: lerp(pa.y, pb.y, t),
       };
     } else if (sameShape(pt, ['*', '+', '*'])) {
-      const [ a, op, b ] = pt;
+      const [ ap, op, bp ] = pt;
+      const a = Geom.point(ap);
+      const b = Geom.point(bp);
       switch (op) {
         case '+': return Geom.Pt(a.x + b.x, a.y + b.y);
         case '-': return Geom.Pt(a.x - b.x, a.y - b.y);

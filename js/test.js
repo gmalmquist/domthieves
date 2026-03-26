@@ -84,6 +84,30 @@ T.TestPoint = async function() {
   );
 
   check(
+    {x: 4, y: 6},
+    [ {x: 1, y: 2}, '+', { x: 3, y: 4 }],
+    'plus',
+  );
+
+  check(
+    {x: -2, y: -3},
+    [ {x: 1, y: 2}, '-', { x: 3, y: 5 }],
+    'minus',
+  );
+
+  check(
+    {x: 3, y: 10},
+    [ {x: 1, y: 2}, '*', { x: 3, y: 5 }],
+    'times',
+  );
+
+  check(
+    {x: 0.5, y: 2},
+    [ {x: 2, y: 12}, '/', { x: 4, y: 6 }],
+    'divide',
+  );
+
+  check(
     {x: 2, y: 5},
     { left: 2, top: 5 },
     'left top',
