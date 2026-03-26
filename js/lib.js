@@ -22,12 +22,9 @@ DT.Anim.TakeElement = async (element, target, args) => {
   args = firstNotNone(args, {});
   const durationMilli = firstNotNone(args.durationMilli, 500);
   const scaleDown = firstNotNone(args.scale, 0.01);
-  const remove = firstNotNone(args.removeWhenDone, true);
   const angle = firstNotNone(args.angle, '135deg');
-  
-  element.style.transitionProperty = 'transform';
-  element.style.transitionDuration = `${durationMilli / 1000.0}s`;
-  element.style.transformOrigin = "center";
+  const reverse = firstNotNone(args.reverse, false);
+  const remove = firstNotNone(args.remove, true);
 
   const centroid = Geom.point(['centroid', element]);
 
@@ -42,18 +39,51 @@ DT.Anim.TakeElement = async (element, target, args) => {
     console.log(element.style.transform, target, centroid, d);
   };
   
-  setTransform('0deg', 1.0);
+  setTransform(reverse ? angle : '0deg', reverse ? scaleDown : 1.0);
+  if (Number.parseFloat(element.style.opacity) === 0.0) {
+    element.style.opacity = '1.0';
+  }
+
+  element.style.transitionProperty = 'transform';
+  element.style.transitionDuration = `${durationMilli / 1000.0}s`;
+  element.style.transformOrigin = "center";
+  
   await new Promise(resolve => setTimeout(() => {
-    setTransform(angle, scaleDown);
+    setTransform(reverse ? '0deg' : angle, reverse ? 1.0 : scaleDown);
     resolve();
   }, 10));
+
   await new Promise(resolve => setTimeout(() => {
-    element.style.display = 'none';
-    if (remove) {
+    if (!remove) {
+      element.style.display = 'none';
       element.remove();
     }
     resolve();
   }, durationMilli));
+
+  return element;
+};
+
+DT.Anim.PlaceElement = async (element, target, args) => {
+  if (isSome(args.over)) {
+    // place element on top of existing element
+    element.style.opacity = '0';
+    element.style.position = 'absolute';
+    if (element.style.display === 'inline') {
+      element.style.display = 'block';
+    }
+    
+    if (isNone(element.parentNode)) {
+      document.body.appendChild(element);
+      await new Promise(r => setTimeout(r, 10));
+    }
+
+    const ebounds = Geom.getDocumentBoundingRect(element);
+    const tcenter = Geom.point(['centroid', Geom.getDocumentBoundingRect(args.over)]);
+    element.style.left = tcenter.x - ebounds.width / 2;
+    element.style.top = tcenter.y - ebounds.height / 2;
+  }
+  return await DT.Anim.TakeElement({ ...args, reverse: true });
 };
 
 DT.ForEachLootItem = async (callback) => {
@@ -76,9 +106,9 @@ DT.ForEachLootItem = async (callback) => {
       if (typeof item === 'string') {
         continue;
       }
-      if (isNone(item.dom.dataset.lootID)) {
+      if (isNone(item.dom.dataset.lootId)) {
         const id = await DT.Fetch('/server/uuid').then(r => r.text());
-        item.dom.dataset.lootID = id;
+        item.dom.dataset.lootId = id;
       }
       callback(item);
     }
@@ -291,6 +321,17 @@ DT.LocateUse = use => {
   }
 };
 
+DT.Reify = html => {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  if (wrap.children.length === 1) {
+    const n = wrap.children[0];
+    n.remove();
+    return n;
+  }
+  return wrap;
+};
+
 DT.PhantomClone = item => {
   const place = Geom.getDocumentBoundingRect(item.dom);
 
@@ -369,6 +410,7 @@ DT.Pirate = (item) => {
   item.dom.style.pointerEvents = 'none';
 
   item.dom.dataset.lootStolen = 'true';
+  item.dom.dataset.lootKind = item.item.original_use;
 
   return copy;
 };
@@ -673,6 +715,9 @@ DT.Recruit = async () => {
 
   thief.walkTo = item => {
     const el = DT.PhantomClone(item);
+    thief.walkToElement(el);
+  };
+  thief.walkToElement = el => {
     el.style.opacity = '0';
     document.body.appendChild(el);
     const state = {
@@ -696,7 +741,7 @@ DT.Recruit = async () => {
         return dir === state.dir;
       });
     };
-    const task = thief.newTask(`walking to ${item.item.name}`, (dt) => {
+    const task = thief.newTask(`walking`, (dt) => {
       const vector = thief.getDeltaTo(el);
       if (!state.gottenClose && Math.abs(vector.x) + Math.abs(vector.y) < 50) {
         thief.asyncTask(thief.hideNametag());
@@ -736,6 +781,33 @@ DT.Recruit = async () => {
     thief.addTask(task);
   };
 
+  thief.place = (item, target) => {
+    if (isNone(target.dataset.lootStolen) || isNone(target.parentNode)) {
+      return; // nothing to replace
+    }
+    thief.addTask(thief.showNametag());
+    thief.walkToElement(target);
+    thief.addTask(thief.hideNametag());
+    thief.addTask(thief.newTask('placing', (dt) => {
+      if (isNone(target.dataset.lootStolen) || isNone(target.parentNode)) {
+        return; // nothing to replace
+      }
+      if (thief.anim.lastPlayed === 'stand-l' || thief.anim.lastPlayed === 'walk-l') {
+        thief.play('reach-l');
+      } else if (thief.anim.lastPlayed === 'stand-r' || thief.anim.lastPlayed === 'walk-r') {
+        thief.play('reach-r');
+      }
+      const el = DT.Reify(item.dom);
+      setTimeout(() => DT.Anim.PlaceElement(el, ['centroid', spriteblock], { over: target}).then(el => {
+        target.replaceWith(el);
+        thief.play('stand-f');
+        thief.sack = thief.sack.filter(x => x.id !== item.id);
+        thief.sackSize = thief.sack.map(item => item.size).reduce((a, b) => a + b, 0);
+      }));
+    }));
+    thief.addTask(thief.showNametag());
+  };
+
   thief.take = item => {
     if (item.size + thief.sackSize >= DT.maxRequestSize) {
       return 
@@ -759,7 +831,7 @@ DT.Recruit = async () => {
         thief.play('reach-r');
       }
       const el = DT.Pirate(item);
-      setTimeout(() => DT.Anim.TakeElement(el, ['centroid', spriteblock], { remove: true }).then(() => {
+      setTimeout(() => DT.Anim.TakeElement(el, ['centroid', spriteblock]).then(() => {
         thief.play('stand-f');
         item.item.stolen_by = thief.meta.name;
         thief.sack.push(item.item);
@@ -839,6 +911,23 @@ DT.Recruit = async () => {
 
   const consideredItems = {};
   thief.survey = async () => {
+    if (thief.sack.length > 0) {
+      const holes = document.querySelectorAll('[data-loot-stolen]');
+      for (const hole of holes) {
+        const kind = hole.dataset.lootKind;
+        if (isEmpty(kind)) {
+          continue;
+        }
+        for (const item of thief.sack) {
+          // TODO: skip if we stole it from here just now lol
+          if (item.uses.some(k => k === kind)) {
+            thief.place(item, hole);
+            return;
+          }
+        }
+      }
+    }
+
     if (thief.sack.length >= 3) {
       // we got enough stuff tbh
       console.log(thief.meta.name, 'absconded with a full sack of loot.');
@@ -848,7 +937,7 @@ DT.Recruit = async () => {
 
     const list = [];
     await DT.ForEachLootItem(item => {
-      const id = item.dom.dataset.lootID;
+      const id = item.dom.dataset.lootId;
       if (isNone(id) || consideredItems[id]) {
         return;
       }
@@ -862,7 +951,7 @@ DT.Recruit = async () => {
     }
 
     const item = list[Math.floor(Math.random() * list.length)];
-    consideredItems[item.dom.dataset.lootID] = true;
+    consideredItems[item.dom.dataset.lootId] = true;
 
     console.log(thief.meta.name, 'is taking a look-see at', item.item.name);
 
