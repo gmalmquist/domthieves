@@ -777,8 +777,10 @@ DT.Recruit = async (shoppingList) => {
   };
   thief.walkToElement = el => {
     el.style.opacity = '0';
+    let mustRemoveLater = false;
     if (isNone(el.parentNode)) {
       document.body.appendChild(el);
+      mustRemoveLater = true;
     }
     const state = {
       dir: '',
@@ -825,7 +827,10 @@ DT.Recruit = async (shoppingList) => {
       } else {
         thief.play('stand-f');
       }
-     
+
+      if (mustRemoveLater) {
+        el.remove();
+      }
       return false;
     });
     thief.addTask(task);
@@ -852,6 +857,10 @@ DT.Recruit = async (shoppingList) => {
           'title',
           `Replacement for ${el.dataset.lootReplacement}, courtesy of ${thief.meta.name}. Originally stolen from ${item.home} by ${item.stolen_by}.`,
         );
+        el.removeAttribute('data-loot');
+        el.removeAttribute('data-loot-kind');
+        el.removeAttribute('data-loot-stolen');
+        el.removeAttribute('data-loot-stolen-by');
         thief.play('stand-f');
         thief.sack = thief.sack.filter(x => x.id !== item.id);
         thief.sackSize = thief.sack.map(item => item.size).reduce((a, b) => a + b, 0);
@@ -1150,7 +1159,7 @@ DT.Initialize = async () => {
       clearInterval(DT._surveyInt);
       return;
     }
-    if (Math.random() < 0.25) {
+    if (Math.random() < 0.10) {
       DT.Recruit();
     }
   }, 1000);
