@@ -314,7 +314,8 @@ DT.PhantomClone = item => {
   return copy;
 };
 
-DT.Steal = (item) => {
+// Pirating an item makes a copy of it, and hides the original.
+DT.Pirate = (item) => {
   const copy = DT.PhantomClone(item);
 
   copy.setAttribute('title', `${item.item.name} is being stolen`);
@@ -717,7 +718,7 @@ DT.Recruit = async () => {
       } else if (thief.anim.lastPlayed === 'stand-r' || thief.anim.lastPlayed === 'walk-r') {
         thief.play('reach-r');
       }
-      const el = DT.Steal(item);
+      const el = DT.Pirate(item);
       el.style.transitionProperty = 'transform';
       el.style.transitionDuration = '0.5s';
       el.style.transformOrigin = "center";

@@ -94,3 +94,106 @@ Geom.getVisibleBoundingRect = function(element) {
   return Geom.intersectRects(Geom.getDocumentBoundingRect(element), Geom.viewport());
 }
 
+Geom.point = (spec) => {
+  const ANGLE = /^(?<num>\d+([.]\d*)?)(?<unit>rad|deg|°)$/i;
+  let pt = spec;
+  while (typeof pt === 'function') {
+    pt = pt();
+  }
+  if (Array.isArray(pt)) {
+    if (sameShape(pt, [0, 0])) {
+      const [ x, y ] = pt;
+      return { x, y };
+    }
+    if (sameShape(pt, ['*', 0, '*'])) {
+      const [ a, t, b ] = pt;
+      const pa = Geom.point(a);
+      const pb = Geom.point(b);
+      return {
+        x: lerp(pa.x, pb.x, t),
+        y: lerp(pa.y, pb.y, t),
+      };
+    } else if (sameShape(pt, ['30deg', 1])) {
+      const [a, d] = pt;
+      const m = ANGLE.exec(a);
+      if (isSome(m)) {
+        const val = Number.parseFloat(m.groups.num);
+        const unit = m.groups.unit.toLocaleLowerCase();
+        let angle = val;
+        if (unit === 'deg' || unit === '°') {
+          angle *= Math.PI / 180;
+        }
+        return {
+          x: d * Math.cos(angle),
+          y: d * Math.sin(angle),
+        };
+      }
+    } else if (sameShape(pt, ['east', {}])) {
+      const [str, obj] = pt;
+      let rect = null;
+      if (sameShape(obj, { left: 0, right: 0, top: 0, bottom: 0})) {
+        rect = obj;
+      } else if (obj instanceof Node) {
+        rect = Geom.getDocumentBoundingRect(obj);
+      } else if (sameShape(obj, { x: 0, y: 0, width: 0, height: 0})) {
+        rect = {
+          left: obj.x,
+          right: obj.x + obj.width,
+          top: obj.y,
+          bottom: obj.y + obj.height,
+        };
+      } else if (sameShape(obj, { x: 0, y: 0 })) {
+        return obj;
+      } else {
+        throw new Error(`directional expression with non-rectable righthand arg ${JSON.stringify(pt)}`);
+      }
+      const cx = rect.left/2.0 + rect.right/2.0;
+      const cy = rect.top/2.0 + rect.bottom/2.0;
+      switch(str) {
+        case "center":
+        case "centroid":
+          return { x: cx, y: cy };
+        case "n":
+        case "north":
+          return { x: cx, y: rect.top };
+        case "s":
+        case "south":
+          return { x: cx, y: rect.bottom };
+        case "e":
+        case "east":
+          return { x: rect.right, y: cy };
+        case "w":
+        case "west":
+          return { x: rect.left, y: cy };
+        case "ne":
+        case "northeast":
+          return { x: rect.right, y: rect.top };
+        case "nw":
+        case "northwest":
+          return { x: rect.left, y: rect.top };
+        case "se":
+        case "southeast":
+          return { x: rect.right, y: rect.bottom };
+        case "sw":
+        case "southwest":
+          return { x: rect.left, y: rect.bottom };
+        default:
+          throw new Error(`Unrecognized direction '${direction}'`, str);
+      }
+    }
+    throw new Error(`Unrecognized array point expression ${JSON.stringify(pt)}`);
+  } else if (typeof pt === 'object') {
+    if (sameShape(pt, { x: 0, y: 1})) {
+      return pt;
+    } else if (sameShape(pt, { rel: '*', to: '*'})) {
+      const a = Geom.point(pt.rel);
+      const b = Geom.point(pt.to);
+      return { x: a.x + b.x, y: a.y + b.y };
+    } if (sameShape(pt, { left: 0, top: 0 })) {
+      return { x: pt.left, y: pt.top };
+    }
+  }
+  throw new Error(`Unrecognized point expression ${JSON.stringify(pt)}`);
+};
+
+

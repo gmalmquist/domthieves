@@ -75,3 +75,39 @@ function dedup(arr, keyfunc) {
   return res;
 }
 
+function sameShape(one, two) {
+  if (isNone(two)) { return true; }
+  if (isNone(one)) { return false; }
+  if (two === '*') { return true; }
+  if (typeof one !== typeof two) {
+    return false;
+  }
+  if (typeof one !== 'object') {
+    return true;
+  }
+  if (Array.isArray(two) && !Array.isArray(one)) {
+    return false;
+  }
+  if (Array.isArray(one)) {
+    if (Array.isArray(two)) {
+      if (one.length !== two.length) {
+        return false;
+      }
+      return one.every((x, i) => sameShape(x, two[i]));
+    }
+    if (typeof two.every === 'function') {
+      return one.every(two.every);
+    }
+    if (typeof two.some === 'function') {
+      return one.some(two.some);
+    }
+    return false;
+  }
+  for (const key of Object.keys(two)) {
+    if (!sameShape(one[key], two[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
