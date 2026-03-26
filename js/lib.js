@@ -479,7 +479,7 @@ DT.Recruit = async () => {
   thief.taskQueue = [];
 
   if (!isEmpty(meta.spritesheet)) {
-    thief.anim = await DT.FetchSpritesheet(meta.spritesheet);
+    thief.anim = await Sprites.FetchSheet(meta.spritesheet);
     if (isSome(thief.anim)) {
       spriteblock.appendChild(thief.anim.spriteview);
     }
@@ -841,18 +841,13 @@ DT.Recruit = async () => {
     thief.addTask(thief.showNametag());
   };
 
-  thief.play = (animation, listener) => {
+  thief.play = (animation) => {
     if (isNone(thief.anim)) {
       return;
     }
     const playing = thief.anim.spritesheet.sprite_map[thief.anim.playing];
     if (isSome(playing) && playing.kinds.some(k => k === animation)) {
       return;
-    }
-    if (isSome(listener)) {
-      thief.anim.tickers.push(tick => {
-        return listener(tick);
-      });
     }
     thief.anim.playKind(animation, true);
   };
@@ -989,6 +984,15 @@ DT.Recruit = async () => {
     thief.survey();
   };
 
+  //  handle movement
+  thief.anim.tickers.push(tick => {
+    if (isNone(tick.movement)) {
+      return true;
+    }
+
+    return true;
+  });
+
   const delay = 20;
   const dt = (delay / 1000.0);
   thief.taskLoop = setInterval(() => {
@@ -1039,214 +1043,6 @@ DT.Recruit = async () => {
   document.body.appendChild(thief.node);
   DT.thieves.push(thief);
   return thief;
-};
-
-DT.FetchSpritesheet = async (url) => {
-  const resp = await fetch(url);
-  if (!resp.ok) {
-    console.error(`couldn't load spritesheet at ${url}`);
-    return null;
-  }
-
-  const spritesheet = await resp.json();
-
-  if (!spritesheet.url.startsWith('http:')
-    && !spritesheet.url.startsWith('https:')) {
-    if (spritesheet.url.startsWith('/')) {
-      spritesheet.url = spritesheet.url.substring(1);
-    }
-    if (url.endsWith('/')) {
-      spritesheet.url = `${url}${spritesheet.url}`;
-    } else {
-      const slash = url.lastIndexOf('/');
-      spritesheet.url = `${url.substring(0, slash)}/${spritesheet.url}`;
-    }
-  }
-
-  if (isEmpty(spritesheet.sprite_map)) {
-    return null;
-  }
-
-  const reversed = (arr) => {
-    if (isNone(arr)) {
-      return arr;
-    }
-    const rev = new Array(arr.length);
-    for (let i = 0; i < arr.length; i++) {
-      rev[arr.length - i - 1] = arr[i];
-    }
-    return rev;
-  };
-
-  spritesheet.kinds = {};
-
-  for (const sprite of Object.values(spritesheet.sprite_map)) {
-    // default to scanning sprites left to right
-    if (isNone(sprite.play_direction)) {
-      sprite.play_direction = 1;
-    }
-
-    // if a kind isn't specified, just use the name (basically
-    // creates a unique kind)
-    if (isEmpty(sprite.kinds)) {
-      sprite.kinds = [ sprite.name ];
-    }
-    if (!sprite.kinds.some(k => k === sprite.name)) {
-      sprite.kinds.push(sprite.name);
-    }
-    for (const kind of sprite.kinds) {
-      let arr = spritesheet.kinds[kind];
-      if (isEmpty(arr)) {
-        arr = [];
-      }
-      arr.push(sprite.name);
-      spritesheet.kinds[kind] = arr;
-    }
-  }
-
-  if (isNone(spritesheet.sprite_map['abscond'])) {
-    // default to abscond being equal to the reverse of appear
-    const appear = spritesheet.sprite_map['appear'];
-    const abscond = {
-      ...appear,
-      name: 'abscond',
-      delay_milli: reversed(appear.delay_milli),
-      distance_moved_per_frame: reversed(appear.distance_moved_per_frame),
-      first_frame_x: appear.first_frame_x + appear.frame_width * (appear.frame_count - 1),
-      play_direction: -appear.play_direction,
-    };
-    spritesheet.sprite_map['abscond'] = abscond;
-  }
-
-  const spriteview = document.createElement('div');
-  spriteview.style.position = 'absolute';
-  spriteview.style.display = 'block';
-  spriteview.style.overflow = 'hidden';
-  spriteview.style.userSelect = 'none';
-  spriteview.style.backgroundRepeat = 'no-repeat';
-  spriteview.style.backgroundPosition = '0px 0px';
-  spriteview.style.backgroundImage = `url("${spritesheet.url}")`;
-  spriteview.style.width = '1px';
-  spriteview.style.height = '1px';
-
-  const anim = {
-    spritesheet,
-    spriteview,
-    playing: '',
-    frameIndex: 0,
-    stopRequest: null,
-    tickers: [],
-    finishCallbacks: [],
-  };
-
-  anim.playKind = (kind, interrupt) => {
-    if (isSome(anim.playing)) {
-      if (!interrupt) {
-        return false;
-      }
-      const sprite = anim.spritesheet.sprite_map[anim.playing];
-      if (isSome(sprite) && sprite.kinds.some(k => k === kind)) {
-        return false;
-      }
-      anim.stop();
-    }
-    const options = anim.spritesheet.kinds[kind];
-    if (isEmpty(options)) {
-      return false;
-    }
-    const animation = options[Math.floor(Math.random() * options.length)];
-    anim.play(animation);
-    return true;
-  };
-
-  anim.play = (name) => {
-    const first = !isEmpty(name) && name !== anim.playing;
-    const sprite = !isEmpty(name) ? spritesheet.sprite_map[name] : spritesheet.sprite_map[anim.playing];
-    if (isNone(sprite)) {
-      if (!isEmpty(anim.playing)) {
-        anim.stop();
-        return;
-      }
-      anim._finish(name);
-      return;
-    }
-    anim.playing = sprite.name;
-    anim.lastPlayed = sprite.name;
-    if (first) {
-      anim.spriteview.style.width = `${sprite.frame_width}px`;
-      anim.spriteview.style.height = `${sprite.frame_height}px`;
-      anim.iter = 0;
-      anim.frameIndex = 0;
-    }
-    if (anim.frameIndex >= sprite.frame_count) {
-      anim.frameIndex = 0;
-    }
-    const offsetX = -sprite.first_frame_x - (sprite.frame_width * anim.frameIndex * sprite.play_direction);
-    anim.spriteview.style.backgroundPosition = `${offsetX}px ${-sprite.first_frame_y}px`;
-
-    const tick = {
-      animation: sprite.name,
-      frameIndex: anim.frameIndex,
-      frameCount: sprite.frame_count,
-      delay: sprite.delay_milli[anim.frameIndex],
-      iteration: anim.iter,
-      loopCount: sprite.loop_count,
-      distance: isEmpty(sprite.distance_moved_per_frame)
-        ? null : sprite.distance_moved_per_frame[anim.frameIndex],
-    };
-
-    const tickers = [...anim.tickers];
-    anim.tickers = [];
-    for (const ticker of tickers) {
-      if (ticker(tick)) {
-        anim.tickers.push(ticker);
-      }
-    }
-
-    if (anim.frameIndex === sprite.frame_count - 1 && sprite.loop_count !== 0) {
-      if (isSome(anim.stopRequest)) {
-        if (typeof anim.stopRequest === 'function') {
-          anim.stopRequest();
-        }
-        anim.stopRequest = null;
-        anim.playing = '';
-        anim._finish(sprite.name);
-        return
-      }
-      if (sprite.loop_count < 0 || anim.iter >= sprite.loop_count) {
-        anim.playing = '';
-        anim._finish(sprite.name);
-        return;
-      }
-    }
-
-    setTimeout(() => {
-      if (sprite.name !== anim.playing) {
-        return;
-      }
-      anim.frameIndex += 1;
-      anim.play(sprite.name);
-    }, sprite.delay_milli[anim.frameIndex]);
-  };
-
-  anim.onFinish = () => new Promise(resolve => {
-    if (isEmpty(anim.playing)) {
-      resolve();
-      return;
-    }
-    anim.finishCallbacks.push(resolve);
-  });
-
-  anim._finish = (animation) => {
-    anim.finishCallbacks.forEach(c => c(animation));
-    anim.finishCallbacks = [];
-  };
-
-  anim.stop = () => new Promise(resolve => {
-    anim.stopRequest = resolve;
-  });
-
-  return anim;
 };
 
 DT.Offer = async (item) => {
