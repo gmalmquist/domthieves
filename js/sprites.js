@@ -65,6 +65,8 @@ Sprites.FetchSheet = async (url, args) => {
       arr.push(sprite.name);
       spritesheet.kinds[kind] = arr;
     }
+
+    Sprites.calcMovement(sprite);
   }
 
   if (isNone(spritesheet.sprite_map['abscond'])) {
@@ -80,9 +82,6 @@ Sprites.FetchSheet = async (url, args) => {
     };
     spritesheet.sprite_map['abscond'] = abscond;
   }
-
-  // calculate movement
-  Sprites.calcMovement(spritesheet);
 
   Sprites.sheets[url] = spritesheet;
   return Sprites.inflate(Sprites.sheets[url]);
@@ -137,7 +136,7 @@ Sprites.calcMovement = sprite => {
   }
 
   let totalv = { x: 0, y: 0 };
-  let totals = { x: 0, y: 0 };
+  let totals = 0;
   for (const v of move.velocities) {
     totalv.x += v.x;
     totalv.y += v.y;
@@ -161,7 +160,7 @@ Sprites.calcVelocities = sprite => {
   move.velocities.fill({x: 0, y: 0});
 
   if (!isEmpty(move.velocity)) {
-    move.velocities = new Array(sprite.frame_count).map(_ => move.velocity);
+    move.velocities.fill(move.velocity);
     return;
   }
 
@@ -262,6 +261,14 @@ Sprites.inflate = blob => {
     finishCallbacks: [],
   };
 
+  anim.speedOf = (name) => {
+    const sprite = anim.spritesheet.sprite_map[name];
+    if (isNone(sprite)) {
+      return 0;
+    }
+    return sprite.movement.avg.speed;
+  };
+
   anim.playKind = (kind, interrupt) => {
     if (isSome(anim.playing)) {
       if (!interrupt) {
@@ -310,13 +317,12 @@ Sprites.inflate = blob => {
     const tick = {
       animation: sprite.name,
       movement: sprite.movement,
+      velocity: sprite.movement.velocities[anim.frameIndex],
       frameIndex: anim.frameIndex,
       frameCount: sprite.frame_count,
       delay: sprite.delay_milli[anim.frameIndex],
       iteration: anim.iter,
       loopCount: sprite.loop_count,
-      distance: isEmpty(sprite.distance_moved_per_frame)
-        ? null : sprite.distance_moved_per_frame[anim.frameIndex],
     };
 
     const tickers = [...anim.tickers];

@@ -24,7 +24,6 @@
         50,
         50
       ],
-      "distance_moved_per_frame": null,
       "loop_count": -1
     },
     "reach-l": {
@@ -43,7 +42,6 @@
       "delay_milli": [
         0
       ],
-      "distance_moved_per_frame": null,
       "loop_count": -1
     },
     "reach-r": {
@@ -62,7 +60,6 @@
       "delay_milli": [
         0
       ],
-      "distance_moved_per_frame": null,
       "loop_count": -1
     },
     "stand-b": {
@@ -81,7 +78,6 @@
       "delay_milli": [
         250
       ],
-      "distance_moved_per_frame": null,
       "loop_count": -1
     },
     "stand-f": {
@@ -101,7 +97,6 @@
       "delay_milli": [
         100
       ],
-      "distance_moved_per_frame": null,
       "loop_count": -1
     },
     "stand-l": {
@@ -121,7 +116,6 @@
       "delay_milli": [
         250
       ],
-      "distance_moved_per_frame": null,
       "loop_count": -1
     },
     "stand-r": {
@@ -141,7 +135,6 @@
       "delay_milli": [
         250
       ],
-      "distance_moved_per_frame": null,
       "loop_count": -1
     },
     "walk-b": {
@@ -161,7 +154,9 @@
         100,
         100
       ],
-      "distance_moved_per_frame": [4, 4],
+      "movement": {
+        "velocity": { "x": 0, "y": -4 }
+      },
       "loop_count": 0
     },
     "walk-f": {
@@ -181,7 +176,9 @@
         100,
         100
       ],
-      "distance_moved_per_frame": null,
+      "movement": {
+        "velocity": { "x": 0, "y": 4 }
+      },
       "loop_count": 0
     },
     "walk-l": {
@@ -201,7 +198,9 @@
         100,
         100
       ],
-      "distance_moved_per_frame": null,
+      "movement": {
+        "velocity": { "x": -4, "y": 0 }
+      },
       "loop_count": 0
     },
     "walk-r": {
@@ -221,7 +220,9 @@
         100,
         100
       ],
-      "distance_moved_per_frame": null,
+      "movement": {
+        "velocity": { "x": 4, "y": 0 }
+      },
       "loop_count": 0
     }
   }
