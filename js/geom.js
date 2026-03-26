@@ -94,6 +94,8 @@ Geom.getVisibleBoundingRect = function(element) {
   return Geom.intersectRects(Geom.getDocumentBoundingRect(element), Geom.viewport());
 }
 
+Geom.Pt = (x, y) => ({ x, y });
+
 Geom.point = (spec) => {
   const ANGLE = /^(?<num>\d+([.]\d*)?)(?<unit>rad|deg|°)$/i;
   let pt = spec;
@@ -113,6 +115,15 @@ Geom.point = (spec) => {
         x: lerp(pa.x, pb.x, t),
         y: lerp(pa.y, pb.y, t),
       };
+    } else if (sameShape(pt, ['*', '+', '*'])) {
+      const [ a, op, b ] = pt;
+      switch (op) {
+        case '+': return Geom.Pt(a.x + b.x, a.y + b.y);
+        case '-': return Geom.Pt(a.x - b.x, a.y - b.y);
+        case '*': return Geom.Pt(a.x * b.x, a.y * b.y);
+        case '/': return Geom.Pt(a.x / b.x, a.y / b.y);
+      }
+      throw new Error(`Unknown binary operation '${op}'`);
     } else if (sameShape(pt, ['30deg', 1])) {
       const [a, d] = pt;
       const m = ANGLE.exec(a);
@@ -195,5 +206,4 @@ Geom.point = (spec) => {
   }
   throw new Error(`Unrecognized point expression ${JSON.stringify(pt)}`);
 };
-
 

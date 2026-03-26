@@ -16,6 +16,45 @@ DT.Fetch = async (path, args) => {
   return await fetch(`${DT.ApiRoot}${path}`, args);
 };
 
+DT.Anim = {};
+
+DT.Anim.TakeElement = async (element, target, args) => {
+  args = firstNotNone(args, {});
+  const durationMilli = firstNotNone(args.durationMilli, 500);
+  const scaleDown = firstNotNone(args.scale, 0.01);
+  const remove = firstNotNone(args.removeWhenDone, true);
+  const angle = firstNotNone(args.angle, '135deg');
+  
+  element.style.transitionProperty = 'transform';
+  element.style.transitionDuration = `${durationMilli / 1000.0}s`;
+  element.style.transformOrigin = "center";
+
+  const centroid = Geom.point(['centroid', element]);
+
+  const setTransform = (angle, scale) => {
+    const d = Geom.point([ target, '-', centroid ]);
+    element.style.transform = `
+      translate(${d.x}px, ${d.y}px)
+      rotate(${angle})
+      scale(${scale})
+      translate(${-d.x}px, ${d.y}px)
+    `;
+  };
+  
+  setTransform('0deg', 1.0);
+  await new Promise(resolve => setTimeout(() => {
+    setTransform(angle, scaleDown);
+    resolve();
+  }, 10));
+  await new Promise(resolve => setTimeout(() => {
+    element.style.display = 'none';
+    if (remove) {
+      element.remove();
+    }
+    resolve();
+  }, durationMilli));
+};
+
 DT.ForEachLootItem = async (callback) => {
   const selectors = [
     '[data-loot]',
