@@ -105,7 +105,6 @@ DT.Anim.ReplaceElement = async (html, srcPoint, dstElement) => {
       scale(${scale})
       translate(${-d.x}px, ${d.y}px)
     `;
-    console.log(phantom.style.transform);
   };
 
   setTransform('-135deg', 0.001);
@@ -821,7 +820,6 @@ DT.Recruit = async () => {
     if (isNone(target.dataset.lootStolen) || isNone(target.parentNode)) {
       return; // nothing to replace
     }
-    console.log(thief.meta.name, 'gonna replace', item.name, 'over', target);
     thief.addTask(thief.showNametag());
     thief.walkToElement(target);
     thief.addTask(thief.hideNametag());
@@ -1000,7 +998,6 @@ DT.Recruit = async () => {
         return;
       }
 
-      console.log('taking', item.item.name);
       thief.take(item);
     }));
   };
