@@ -24,7 +24,6 @@ DT.Anim.TakeElement = async (element, target, args) => {
   const scaleDown = firstNotNone(args.scale, 0.01);
   const angle = firstNotNone(args.angle, '135deg');
   const reverse = firstNotNone(args.reverse, false);
-  const remove = firstNotNone(args.remove, true);
 
   const centroid = Geom.point(['centroid', element]);
 
@@ -53,10 +52,8 @@ DT.Anim.TakeElement = async (element, target, args) => {
   }, 10));
 
   await new Promise(resolve => setTimeout(() => {
-    if (!remove) {
-      element.style.display = 'none';
-      element.remove();
-    }
+    element.style.display = 'none';
+    element.remove();
     resolve();
   }, durationMilli));
 
@@ -145,8 +142,15 @@ DT.ForEachLootItem = async (callback) => {
         continue;
       }
       if (isNone(item.dom.dataset.lootId)) {
-        const id = await DT.Fetch('/server/uuid').then(r => r.text());
-        item.dom.dataset.lootId = id;
+        const base = firstNotEmpty(item.dom.dataset.loot, item.dom.dataset.lootKind);
+        for (let i = 0; ; i++) {
+          const id = `${base}-${i}`;
+          if (isSome(document.querySelector(`[data-loot-id="${id}"]`))) {
+            continue;
+          }
+          item.dom.dataset.lootId = id;
+          break;
+        }
       }
       callback(item);
     }
@@ -867,6 +871,7 @@ DT.Recruit = async () => {
       } else if (thief.anim.lastPlayed === 'stand-r' || thief.anim.lastPlayed === 'walk-r') {
         thief.play('reach-r');
       }
+      item.dom.dataset.lootStolenBy = thief.meta.name;
       const el = DT.Pirate(item);
       setTimeout(() => DT.Anim.TakeElement(el, ['centroid', spriteblock]).then(() => {
         thief.play('stand-f');
@@ -955,6 +960,10 @@ DT.Recruit = async () => {
         }
         for (const item of thief.sack) {
           // TODO: skip if we stole it from here just now lol
+          if (hole.dataset.lootStolenBy === thief.meta.name 
+            && item.name === firstNotEmpty(hole.dataset.loot, hole.dataset.lootKind)) {
+              continue; // dont replace self with self
+          }
           if (item.uses.some(k => k === kind)) {
             thief.place(item, hole);
             return;
