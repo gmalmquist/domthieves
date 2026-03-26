@@ -121,7 +121,7 @@ DT.Anim.ReplaceElement = async (html, srcPoint, dstElement) => {
   return replacement;
 };
 
-DT.ForEachLootItem = async (callback) => {
+DT.ForEachLootItem = (callback) => {
   const selectors = [
     '[data-loot]',
     '[data-loot-kind]',
@@ -458,8 +458,14 @@ DT.Pirate = (item) => {
   return copy;
 };
 
-DT.Recruit = async () => {
-  const meta = await DT.Fetch(`/guild/${DT.guild}/recruit`).then(r => r.json());
+DT.Recruit = async (shoppingList) => {
+  let url = `/guild/${DT.guild}/recruit`;
+  if (!isEmpty(shoppingList)) {
+    const qargs = shoppingList.map(kind => `buy=${kind}`).join('&');
+    url = `${url}?${qargs}`;
+  }
+
+  const meta = await DT.Fetch(url).then(r => r.json());
   const thief = {
     meta,
     task: null,
@@ -469,6 +475,11 @@ DT.Recruit = async () => {
     sack: [],
     sackSize: 0,
   };
+
+  if (!isEmpty(thief.meta.lootsack.items)) {
+    thief.sack = [...thief.meta.lootsack.items];
+    thief.sackSize = thief.sack.map(item => item.size).reduce((a, b) => a + b, 0);
+  }
 
   let size = 32; // ??
   let reach = 8;
@@ -876,6 +887,7 @@ DT.Recruit = async () => {
       setTimeout(() => DT.Anim.TakeElement(el, ['centroid', spriteblock]).then(() => {
         thief.play('stand-f');
         item.item.stolen_by = thief.meta.name;
+        item.item.stolenHere = true; // this value isn't persisted to the server
         thief.sack.push(item.item);
         thief.sackSize = thief.sack.map(item => item.size).reduce((a, b) => a + b, 0);
       }));
@@ -959,10 +971,8 @@ DT.Recruit = async () => {
           continue;
         }
         for (const item of thief.sack) {
-          // TODO: skip if we stole it from here just now lol
-          if (hole.dataset.lootStolenBy === thief.meta.name 
-            && item.name === firstNotEmpty(hole.dataset.loot, hole.dataset.lootKind)) {
-              continue; // dont replace self with self
+          if (item.stolenHere) {
+            continue
           }
           if (item.uses.some(k => k === kind)) {
             thief.place(item, hole);
@@ -1114,16 +1124,33 @@ DT.Initialize = async () => {
   DT.inventory = [];
   DT.thieves = [];
 
-  DT._surveyInt = setInterval(async () => {
-    if (DT.thieves.length === 0) {
-      const list = [];
-      await DT.ForEachLootItem(item => {
-        list.push(item);
-      });
-      if (list.length === 0) {
-        clearInterval(DT._surveyInt);
-        return;
+  DT._surveyInt = setInterval(() => {
+    if (DT.thieves.length > 0) {
+      return;
+    }
+    const holes = [];
+    for (const hole of document.querySelectorAll('[data-loot-stolen]')) {
+      if (hole.dataset.lootPhantom || isNone(hole.dataset.lootKind)) {
+        continue;
       }
+      holes.push(hole.dataset.lootKind);
+      if (holes.length > 3) {
+        break;
+      }
+    }
+    if (holes.length > 0) {
+      DT.Recruit(holes);
+      return;
+    }
+    const list = [];
+    DT.ForEachLootItem(item => {
+      list.push(item);
+    });
+    if (list.length === 0) {
+      clearInterval(DT._surveyInt);
+      return;
+    }
+    if (Math.random() < 0.25) {
       DT.Recruit();
     }
   }, 1000);

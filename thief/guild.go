@@ -10,6 +10,8 @@ import (
   "github.com/google/uuid"
 
   "hash/maphash"
+  "math/rand"
+  "slices"
   "time"
 )
 
@@ -96,7 +98,7 @@ func (g *Guild) Recruit(offer JobOffer) *Thief {
 
   var thief *Thief
 
-  if g.idle.Len() > 0 {
+  if g.idle.Len() > 0 && (len(g.Thieves) >= config.Conf.MaxGuildSize || rand.Intn(100) < 10){
     thief = g.idle.PopFront()
     thief.Employer = offer.Origin
     thief.JobDescription = offer.JobDescription
@@ -106,7 +108,6 @@ func (g *Guild) Recruit(offer JobOffer) *Thief {
       GuildID: g.ID,
       Name: g.namegen.Generate(g.Culture),
       Origin: offer.Origin,
-      Spritesheet: offer.Spritesheet,
     }
   }
 
@@ -124,12 +125,60 @@ func (g *Guild) Recruit(offer JobOffer) *Thief {
     thief.Spritesheet = spritesheets[idx]
   }
 
+  thief.LootSack.Items = g.shopFor(&offer, thief)
+
   now := time.Now()
   thief.RecruitedAt = now.Format(time.RFC3339)
   thief.LastTaskAt = now.Format(time.RFC3339)
 
   g.Thieves[thief.ID] = thief
   return thief
+}
+
+func (g *Guild) shopFor(offer *JobOffer, thief *Thief) []*loot.Loot {
+  if offer.ShoppingList == nil || len(offer.ShoppingList) == 0 {
+    return nil
+  }
+  cart := []*loot.Loot{}
+  found := make([]bool, len(offer.ShoppingList))
+  passedUp := -1
+  for attempt := 0; attempt < 6 && passedUp != 0 && len(cart) < len(offer.ShoppingList); attempt++ {
+    allowSameOrigin := attempt >= 3
+    allowSameOriginAndThief := attempt == 5
+    passedUp = 0
+    for i, kind := range offer.ShoppingList {
+      if found[i] || i > config.Conf.MaxShoppingList {
+        continue
+      }
+      arr, ok := g.Loot.uses[loot.Use(kind)]
+      if !ok || len(arr) == 0 {
+        continue
+      }
+      idx := rand.Intn(len(arr))
+      id := arr[idx]
+      pick, ok := g.Loot.Items[id]
+      if !ok {
+        // shouldn't have been in the list in the first place
+        slices.Delete(arr, idx, idx + 1)
+        continue
+      }
+      if pick.Home == offer.Origin {
+        if !allowSameOrigin {
+          passedUp += 1
+          continue
+        }
+        if pick.StolenBy == thief.Name && !allowSameOriginAndThief {
+          passedUp += 1
+          continue
+        }
+      }
+      cart = append(cart, pick)
+      slices.Delete(arr, idx, idx + 1)
+      delete(g.Loot.Items, id)
+      found[i] = true
+    }
+  }
+  return cart
 }
 
 func (g *Guild) Return(tid ThiefID) {

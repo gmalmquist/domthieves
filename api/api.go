@@ -55,6 +55,7 @@ func (api *Api) Setup() {
   mux.StandardHeader.Add("X-Api-Version", Version)
   mux.AlwaysExposeHeaders(
     "X-Api-Version",
+    "X-Origin",
   )
 
   bundle := []byte(JsBundle())
@@ -143,6 +144,9 @@ func (api *Api) Setup() {
 
     origin := r.Header.Get("Origin")
     if origin == "" {
+      origin = r.Header.Get("X-Origin")
+    }
+    if origin == "" {
       origin = "Anonymous"
     }
 
@@ -151,11 +155,10 @@ func (api *Api) Setup() {
     offer := thief.JobOffer{
       Origin: origin,
       JobDescription: q.Get("job"),
-      Spritesheet: q.Get("spritesheet"),
+      ShoppingList: q["buy"],
     }
 
     thief := guild.Recruit(offer)
-
     nu.ReplyJson(thief)
   })
 

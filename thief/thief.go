@@ -37,7 +37,7 @@ func NewID() ThiefID {
 
 type JobOffer struct {
   Origin string `json:"origin"`
-  Spritesheet string `json:"spritesheet"`
   JobDescription string `json:"job_description"`
+  ShoppingList []string `json:"shopping_list"`
 }
 
