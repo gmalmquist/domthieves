@@ -125,7 +125,7 @@ Geom.point = (spec) => {
         }
         return {
           x: d * Math.cos(angle),
-          y: d * Math.sin(angle),
+          y: -d * Math.sin(angle), // flip y to account for web y=down coordinate system
         };
       }
     } else if (sameShape(pt, ['east', {}])) {

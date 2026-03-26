@@ -59,11 +59,14 @@ T.TestSameShape = function() {
 }
 
 T.TestPoint = async function() {
+  const epsEq = (a, b) => {
+    return Math.abs(a - b) < 0.0001;
+  };
   const check = (expect, arg, msg, not) => {
     try {
       const pt = Geom.point(arg);
       T.assert(
-        (pt.x === expect.x && pt.y === expect.y) === !not,
+        (epsEq(pt.x, expect.x) && epsEq(pt.y, expect.y)) === !not,
         `${msg}: expected ${JSON.stringify(expect)} ${!!not ? '!=' : '=='} ${JSON.stringify(pt)}`,
       );
     } catch (e) {
@@ -147,6 +150,12 @@ T.TestPoint = async function() {
       to: ['w', { left: 2, top: 5, right: 4, bottom: 7 }],
     },
     'rel',
+  );
+
+  check(
+    { x: 0, y: -6 },
+    [ '90deg', 6],
+    'polar degrees',
   );
 
   const rect = document.createElement('div');
