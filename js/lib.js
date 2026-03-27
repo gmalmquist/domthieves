@@ -46,11 +46,9 @@ DT.SetElementStyle = (element, style) => {
 DT.Anim = {};
 
 DT.Anim.Transition = (element, durationMillis, property, value) => {
-  console.log(element.dataset.lootId, durationMillis, property, value);
   element.style.transitionDuration = `${durationMillis/1000.0}s`;
   element.style.transitionProperty = property;
   element.style[property] = value;
-  console.log(element, durationMillis, property, value);
   return new Promise(r => setTimeout(r, durationMillis));
 };
 
@@ -1028,11 +1026,11 @@ DT.Recruit = async (shoppingList) => {
     thief.addTask(thief.newTask('taking', (dt) => {
       if (item.dom.dataset.lootStolen) {
         // already stolen
-        console.log(item.item.name, 'was already stolen');
+        ldebug(item.item.name, 'was already stolen');
         return
       }
       if (thief.sackSize + item.size > DT.maxRequestSize) {
-        console.log('no room for', item.size);
+        ldebug('no room for', item.size);
         return;
       }
       thief.playReach(item.dom);
@@ -1126,7 +1124,7 @@ DT.Recruit = async (shoppingList) => {
       console.error(`unable to return thief ${thief.meta.name} home to guild ${thief.meta.guild}`);
       return;
     }
-    console.log(`${thief.meta.name} returned home: ${await r.text()}`);
+    ldebug(`${thief.meta.name} returned home: ${await r.text()}`);
   };
 
   thief.abscond = () => {
@@ -1171,7 +1169,7 @@ DT.Recruit = async (shoppingList) => {
 
     if (thief.sack.length >= 3) {
       // we got enough stuff tbh
-      console.log(thief.meta.name, 'absconded with a full sack of loot.');
+      ldebug(thief.meta.name, 'absconded with a full sack of loot.');
       thief.abscond();
       return;
     }
@@ -1186,7 +1184,7 @@ DT.Recruit = async (shoppingList) => {
     });
 
     if (list.length === 0) {
-      console.log(thief.meta.name, 'could not find anything more to steal.');
+      ldebug(thief.meta.name, 'could not find anything more to steal.');
       thief.abscond();
       return;
     }
@@ -1219,13 +1217,13 @@ DT.Recruit = async (shoppingList) => {
     const item = stealList[Math.floor(Math.random() * stealList.length)];
     consideredItems[item.dom.dataset.lootId] = true;
 
-    console.log(thief.meta.name, 'is taking a look-see at', item.item.name, 'worth', item.value);
+    ldebug(thief.meta.name, 'is taking a look-see at', item.item.name, 'worth', item.value);
 
     thief.walkTo(item);
     thief.addTask(thief.newTask('appraising', () => {
       if (item.size > DT.maxRequestSize) {
         // too big!
-        console.log(item.item.name, 'is too big to steal.');
+        ldebug(item.item.name, 'is too big to steal.');
         return;
       }
 
@@ -1344,9 +1342,7 @@ DT.Initialize = async () => {
   DT.thieves = [];
   DT.budget = 0;
 
-  console.log('⎽⎼⎻⎽⎼⎻⎽⎼⎻ DOM THIEVES ⎽⎼⎻⎽⎼⎻⎽⎼⎻');
-  console.log(`====== API VERSION ${DT.ApiVersion} ======`);
-  DT._surveyInt = setInterval(() => {
+  const mainLoop = () => {
     if (DT.thieves.length > 0) {
       return;
     }
@@ -1381,7 +1377,28 @@ DT.Initialize = async () => {
       // ask to be stolen from, lol.
       DT.Recruit();
     }
-  }, 1000);
+  };
+
+  DT.Disable = () => {
+    clearInterval(DT._surveyInt);
+    DT._surveyInt = null;
+    DT.thieves.forEach(t => {
+      t.taskQueue = [];
+      t.abscond();
+    });
+    console.log('DOMThieves has been turned off. Run DOMThieves.Enable() to turn back on.');
+  };
+
+  DT.Enable = () => {
+    if (isSome(DT._surveyInt)) {
+      return;
+    }
+    console.log('⎽⎼⎻⎽⎼⎻⎽⎼⎻ DOM THIEVES ⎽⎼⎻⎽⎼⎻⎽⎼⎻: To disable, run: DOMThieves.Disable()');
+    ldebug(`====== API VERSION ${DT.ApiVersion} ======`);
+    DT._surveyInt = setInterval(mainLoop, 1000);
+  };
+
+  DT.Enable();
 };
 
 setTimeout(DT.Initialize, 500);

@@ -218,14 +218,14 @@ T.TestAll = async function() {
     if (p instanceof Promise) {
       await p;
     }
-    console.log(`${name}:`, T.results.map(b => b ? '.' : 'x').join(''))
+    ldebug(`${name}:`, T.results.map(b => b ? '.' : 'x').join(''))
     for (const [ e, i ] of T.failures) {
       console.error(`FAIL ${name}-${i}:`, e);
     }
     T.results = [];
     T.failures = [];
   }
-  console.log('all tests run');
+  ldebug('all tests run');
 }
 
 setTimeout(T.TestAll, 1);

@@ -76,12 +76,14 @@ func (api *Api) Setup() {
 
     w.Header().Add("Content-Type", "application/javascript; charset=utf-8")
 
-    w.Write([]byte("window.DOMThieves = (function() {\n"));
+    fmt.Fprint(w, "window.DOMThieves = (function() {\n");
+    fmt.Fprint(w, "function ldebug(...args) { if (DT.Debug) { console.log('D:', ...args); } }\n")
     w.Write(blob);
-    w.Write([]byte("\n"))
-    w.Write([]byte(fmt.Sprintf("DT.ApiVersion = '%v';\n", Version)));
-    w.Write([]byte("return DT;\n"));
-    w.Write([]byte("})();\n"))
+    fmt.Fprint(w, "\n")
+    fmt.Fprintf(w, "DT.ApiVersion = '%v';\n", Version);
+    fmt.Fprintf(w, "DT.Debug = %v;\n", config.Debug);
+    fmt.Fprint(w, "return DT;\n");
+    fmt.Fprint(w, "})();\n")
   })
 
   mux.Handle("GET /api/server/maxrequestsize", func(nu Nu) {
