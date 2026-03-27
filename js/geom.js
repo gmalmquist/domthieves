@@ -25,18 +25,43 @@ Geom.isRect = function(r) {
   return isSome(r.left) && isSome(r.top) && isSome(r.width) && isSome(r.height);
 }
 
+Geom.rectOf = function(obj) {
+  while (typeof obj === 'function') {
+    obj = obj();
+  }
+  if (obj instanceof HTMLElement) {
+    obj = Geom.getDocumentBoundingRect(obj);
+  }
+  if (!Geom.isRect(obj)) {
+    return null;
+  }
+  if (isNone(obj.x)) {
+    obj.x = obj.left;
+    obj.y = obj.top;
+  }
+  if (isNone(obj.width)) {
+    obj.width = obj.right - obj.left;
+    obj.height = obj.bottom - obj.top;
+  }
+  if (isNone(obj.right)) {
+    obj.left = obj.x;
+    obj.top = obj.y;
+    obj.right = obj.x + obj.width;
+    obj.bottom = obj.y + obj.height;
+  }
+  return obj;
+};
+
 Geom.closestPoint = function(point, obj) {
   point = Geom.point(point);
+
   while (typeof obj === 'function') {
     obj = obj();
   }
 
-  if (obj instanceof HTMLElement) {
-    obj = Geom.getDocumentBoundingRect(obj);
-  }
-
-  if (Geom.isRect(obj)) {
-    const { left, top, width, height } = obj;
+  let rect = Geom.rectOf(obj);
+  if (isSome(rect)) {
+    const { left, top, width, height } = rect;
     const right = left + width;
     const bottom = top + height;
     let { x, y } = point;
@@ -183,6 +208,13 @@ Geom.point = (spec, ...unwanted) => {
       };
     } else if (sameShape(pt, ['*', '+', '*'])) {
       const [ ap, op, bp ] = pt;
+      switch (op) {
+        case 'closest':
+        case 'closest to':
+        case 'closest point to':
+          return Geom.closestPoint(ap, bp);
+      }
+
       const a = Geom.point(ap);
       const b = Geom.point(bp);
       switch (op) {
@@ -284,6 +316,7 @@ Vec.det = (a, b) => (a.x * -b.y + a.y * b.x);
 Vec.mag2 = v => (v.x * v.x + v.y * v.y);
 Vec.scale = (s, v) => ({ x: v.x * s, y: v.y * s });
 Vec.add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
+Vec.sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
 Vec.sadd = (a, s, b) => ({ x: a.x + s * b.x, y: a.y + s * b.y });
 Vec.r90 = ({x, y}) => ({x: -y, y: x});
 

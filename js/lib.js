@@ -44,7 +44,80 @@ DT.SetElementStyle = (element, style) => {
   return og;
 };
 
+DT.DrawPoint = (pt, opt) => {
+  return DT.Draw({
+    ...firstNotNone(opt, {}),
+    setup: point => {
+      const r = '4px';
+      point.style.transitionProperty = 'transform';
+      point.style.transitionDuration = '0.25s';
+      point.style.left = `-${r}`;
+      point.style.top = `-${r}`;
+      point.style.height = `calc(${r} * 2)`;
+      point.style.width = `calc(${r} * 2)`;
+      point.style.borderRadius = r;
+      point.style.overflow = 'hidden';
+      point.style.backgroundColor = 'light-dark(black, black)';
+      point.style.borderColor = '#00ffff';
+      point.style.filter = 'invert(100%)';
+      point.style.transform = 'translate(0px, 0px) rotate(0deg)';
+    },
+    update: point => {
+      const a = Geom.point(pt);
+      point.style.transform = `translate(${a.x}px, ${a.y}px)`;
+      point.style.opacity = '1';
+    },
+  });
+};
+
+DT.DrawLine = (src, dst, opt) => {
+  return DT.Draw({
+    ...firstNotNone(opt, {}),
+    setup: line => {
+      line.style.transitionProperty = 'transform';
+      line.style.transitionDuration = '0.25s';
+      line.style.left = '-50px';
+      line.style.top = '-0.5px';
+      line.style.height = '1px';
+      line.style.width = '100px';
+      line.style.transform = 'translate(0px, 0px) rotate(0deg)';
+    },
+    update: line => {
+      const a = Geom.point(src);
+      const b = Geom.point(dst);
+      const vector = Vec.sub(b, a);
+      const center = Geom.point([a, 0.5, b]);
+      if (Vec.mag2(vector) < 1.0) {
+        line.style.opacity = 0;
+        return;
+      }
+      const theta = Math.atan2(vector.y, vector.x) * 180 / Math.PI;
+      const mag = Vec.mag(vector);
+      const scale = mag / 100.0;
+      line.style.transform = [
+        `translate(${center.x}px, ${center.y}px)`,
+        `rotate(${theta}deg)`,
+        `scale(${scale})`,
+      ].join(' ');
+      line.style.opacity = '1';
+    },
+  });
+};
+
 DT.DrawBounds = (rect, opt) => {
+  return DT.Draw({
+    ...firstNotNone(opt, {}),
+    update: rectangle => {
+      const r = Geom.rectOf(rect);
+      rectangle.style.left = `${r.left}px`;
+      rectangle.style.top = `${r.top}px`;
+      rectangle.style.width = `${r.width}px`;
+      rectangle.style.height = `${r.height}px`;
+    },
+  });
+}
+
+DT.Draw = (opt) => {
   if (!DT.Debug) {
     return { remove: () => {} };
   }
@@ -68,48 +141,38 @@ DT.DrawBounds = (rect, opt) => {
     state.alive = () => true;
   }
 
-  const rectangle = document.createElement('div');
-  rectangle.dataset.debug = 'bounds';
-  rectangle.style.position = 'absolute';
-  rectangle.style.border = 'thin solid red';
-  rectangle.style.userSelect = 'none';
-  rectangle.style.pointerEvents = 'none';
+  const drawing = document.createElement('div');
+  drawing.dataset.debug = 'bounds';
+  drawing.style.position = 'absolute';
+  drawing.style.userSelect = 'none';
+  drawing.style.pointerEvents = 'none';
+  drawing.style.border = 'thin solid red';
+  if (isSome(opt.setup)) {
+    opt.setup(drawing);
+  }
 
-  const place = () => {
-    let r = rect;
-    while (typeof r === 'function') {
-      r = r();
-    }
-    if (r instanceof HTMLElement) {
-      r = Geom.getDocumentBoundingRect(r);
-    }
-    rectangle.style.left = `${r.left}px`;
-    rectangle.style.top = `${r.top}px`;
-    rectangle.style.width = `${r.width}px`;
-    rectangle.style.height = `${r.height}px`;
-  };
-
-  rectangle.style.opacity = 0;
-  rectangle.style.transitionProperty = 'opacity';
-  rectangle.style.transitionDuration = '0.5s';
+  drawing.style.opacity = 0;
+  drawing.style.transitionProperty = 'opacity';
+  drawing.style.transitionDuration = '0.5s';
 
   const update = () => {
     if (!state.alive()) {
-      rectangle.style.opacity = '0';
+      drawing.style.opacity = '0';
       return;
     }
-    place();
+    if (isSome(opt.update)) {
+      opt.update(drawing);
+    }
     setTimeout(update, 20);
   };
 
-  place();
-  document.body.appendChild(rectangle);
-  rectangle.style.opacity = '1';
+  document.body.appendChild(drawing);
   update();
+  drawing.style.opacity = '1';
 
   return {
     state,
-    rectangle,
+    drawing,
     remove: () => {
       state.alive = () => false;
     },
@@ -555,6 +618,66 @@ DT.BakeStyle = async (dom, copy) => {
   }
 };
 
+DT.getMinimumBoundingRect = async function(element) {
+  const display = window.getComputedStyle(element).display;
+  const hypothetical = async (display) => {
+    const wrap = document.createElement('div');
+    wrap.style.position = 'absolute';
+    wrap.style.display = 'block';
+    wrap.style.left = '-500vw';
+    wrap.style.top = '1px';
+
+    const clone = await DT.CleanCopyDOM(element);
+    clone.style.display = display;
+    for (const a of clone.getAttributeNames()) {
+      if (a.startsWith('data-')) {
+        clone.removeAttribute(a);
+      }
+      if (a.startsWith('on')) {
+        clone.removeAttribute(a);
+      }
+    }
+    wrap.appendChild(clone);
+
+    document.body.appendChild(wrap);
+    const size = await DT.getMinimumBoundingRect(clone);
+    wrap.remove();
+    const pos = Geom.getDocumentBoundingRect(element);
+    return Geom.rectOf({
+      left: pos.left,
+      top: pos.top,
+      width: size.width,
+      height: size.height,
+    });
+  };
+
+  switch (display) {
+    case "inline":
+    case "inline-block":
+    case "inline-flex":
+    case "inline-grid":
+    case "inline list-item":
+    case "inline-table":
+      return Geom.getDocumentBoundingRect(element);
+    case "contents":
+    case "none":
+    case "flow-root":
+    case "block":
+      return await hypothetical("inline-block");
+    case "list-item":
+      return await hypothetical("inline list-item");
+    case "flex":
+      return await hypothetical("inline-flex")
+    case "grid":
+      return await hypothetical("inline-grid")
+    case "table":
+      return await hypothetical("inline-table")
+    default:
+      console.warn(`Unknown display type ${display}, assuming it's normal.`)
+      return Geom.getDocumentBoundingRect(element)
+  }
+};
+
 DT.LocateUse = use => {
   DT.FindLoot();
   for (const item of DT.inventory) {
@@ -942,105 +1065,7 @@ DT.Recruit = async (shoppingList) => {
     node.style.top = `${bounds.top + dy}px`;
   };
 
-  thief.getCentroidDelta = el => {
-    const src = Geom.getDocumentBoundingRect(spriteblock);
-    const dst = Geom.getDocumentBoundingRect(el);
-    const s = { x: (src.left/2 + src.right/2), y: (src.top/2 + src.bottom/2) };
-    const d = { x: (dst.left/2 + dst.right/2), y: (dst.top/2 + dst.bottom/2) };
-    return { x: d.x - s.x, y: d.y - s.y };
-  };
-
-
-  thief.getDeltaTo = el => {
-    const src = Geom.getDocumentBoundingRect(spriteblock);
-    const dst = Geom.getDocumentBoundingRect(el);
-    const viewport = Geom.viewport();
-
-    let dx = 0;
-    let dy = 0;
-    if (dst.right < src.left - reach) {
-      dx = dst.right - (src.left - reach);
-    } else if (dst.left > src.right + reach) {
-      dx = dst.left - (src.right + reach);
-    }
-
-    if (dst.bottom < src.top - reach) {
-      dy = dst.bottom - src.top;
-    } else if (dst.top > src.bottom + reach) {
-      dy = dst.top - src.bottom;
-    }
-
-    if (dst.bottom - src.height >= viewport.top && dst.bottom <= viewport.bottom) {
-      // prefer standing on level with the bottom of
-      // the thing we want to steal
-      dy = Math.round((dst.bottom - src.height) - src.top);
-    }
-
-    return { x: dx, y: dy };
-  };
-
-  thief.moveToward = (el, delta) => {
-    const src = Geom.getDocumentBoundingRect(spriteblock);
-    const dst = Geom.getDocumentBoundingRect(el);
-    const viewport = Geom.viewport();
-
-    let dx = 0;
-    let dy = 0;
-    if (dst.right < src.left - reach) {
-      dx = dst.right - (src.left - reach);
-    } else if (dst.left > src.right + reach) {
-      dx = dst.left - (src.right + reach);
-    }
-
-    if (dst.bottom < src.top - reach) {
-      dy = dst.bottom - (src.top - reach);
-    } else if (dst.top > src.bottom + reach) {
-      dy = dst.top - (src.bottom + reach);
-    }
-
-    if (dst.bottom - src.height >= viewport.top && dst.bottom <= viewport.bottom) {
-      // prefer standing on level with the bottom of
-      // the thing we want to steal
-      dy = Math.round((dst.bottom - src.height) - src.top);
-    }
-
-    if (dx === 0 && dy === 0) {
-      return false;
-    }
-
-    if (Math.abs(dy) > 0) {
-      // We prioritize walking up, then horizontally. Just looks better.
-      if (dy < 0) {
-        thief.play('walk-b');
-      } else {
-        thief.play('walk-f');
-      }
-      return true;
-    }
-
-    const hypotenuse = Math.sqrt(dx * dx + dy * dy);
-    if (hypotenuse < 0.1) {
-      return false;
-    }
-
-    thief.moveBy(
-      dx * delta / hypotenuse,
-      dy * delta / hypotenuse
-    );
-    return true;
-  };
-
-  thief.walkTo = item => {
-    const el = DT.PhantomClone(item);
-    thief.walkToElement(el);
-  };
-  thief.walkToElement = el => {
-    el.style.opacity = '0';
-    let mustRemoveLater = false;
-    if (isNone(el.parentNode)) {
-      document.body.appendChild(el);
-      mustRemoveLater = true;
-    }
+  thief.walkTo = target => {
     const state = {
       gottenClose: false,
     };
@@ -1053,7 +1078,12 @@ DT.Recruit = async (shoppingList) => {
       thief.play(dir);
     };
     const task = thief.newTask(`walking`, (dt) => {
-      const vector = thief.getDeltaTo(el);
+      const feet = Geom.point(['south', spriteblock]);
+      const targetBounds = Geom.getDocumentBoundingRect(target);
+      const targetPoint = Geom.point([feet, 'closest', targetBounds]);
+      targetPoint.y = targetBounds.bottom;
+      
+      const vector = Geom.point([targetPoint, '-', feet]);
       if (!state.gottenClose && Math.abs(vector.x) + Math.abs(vector.y) < 50) {
         thief.asyncTask(thief.hideNametag());
         state.gottenClose = true;
@@ -1063,7 +1093,7 @@ DT.Recruit = async (shoppingList) => {
         thief.asyncTask(thief.hideNametag());
         thief.addAnimTask('abscond');
         thief.addTask(thief.newTask('teleport', () => {
-          const bounds = Geom.getDocumentBoundingRect(el);
+          const bounds = Geom.getDocumentBoundingRect(target);
           const vector = Geom.point([
             ['centroid', bounds],
             '-',
@@ -1100,15 +1130,15 @@ DT.Recruit = async (shoppingList) => {
         thief.moveBy(vector.x, 0);
       }
 
-      const cv = thief.getCentroidDelta(el);
       thief.playStand();
-
-      if (mustRemoveLater) {
-        el.remove();
-      }
       return false;
     });
-    task.onStart(() => task.onFinish(DT.DrawBounds(el).remove));
+    task.onStart(() => {
+      const bounds = DT.DrawBounds(target);
+      const delta = DT.DrawLine(['south', spriteblock], ['south', target]);
+      task.onFinish(bounds.remove);
+      task.onFinish(delta.remove);
+    });
     thief.addTask(task);
   };
 
@@ -1117,7 +1147,7 @@ DT.Recruit = async (shoppingList) => {
       return; // nothing to replace
     }
     thief.addTask(thief.showNametag());
-    thief.walkToElement(target);
+    thief.walkTo(target);
     thief.addTask(thief.hideNametag());
     thief.addTask(thief.newTask('placing', (dt) => {
       if (isNone(target.dataset.lootStolen) || isNone(target.parentNode)) {
@@ -1146,7 +1176,7 @@ DT.Recruit = async (shoppingList) => {
       return 
     }
     thief.addTask(thief.showNametag());
-    thief.walkTo(item);
+    thief.walkTo(item.dom);
     thief.addTask(thief.hideNametag());
     thief.addTask(thief.newTask('tug', () => {
       thief.playReach(item.dom);
@@ -1354,7 +1384,7 @@ DT.Recruit = async (shoppingList) => {
 
     ldebug(thief.meta.name, 'is taking a look-see at', item.item.name, 'worth', item.value);
 
-    thief.walkTo(item);
+    thief.walkTo(item.dom);
     thief.addTask(thief.newTask('appraising', () => {
       if (item.size > DT.maxRequestSize) {
         // too big!
