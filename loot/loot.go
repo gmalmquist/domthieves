@@ -137,7 +137,7 @@ type Loot struct {
   Home string `json:"home"`
 
   // Price in gold pieces
-  Price int `json:"price"`
+  Price int64 `json:"price"`
 }
 
 // A thief's Sack of stolen Loot

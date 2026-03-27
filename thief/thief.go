@@ -29,6 +29,10 @@ type Thief struct {
   Spritesheet string `json:"spritesheet"`
   // Stolen DOM
   LootSack loot.Sack `json:"lootsack"`
+  // How much things are worth.
+  Pricesheet map[loot.Use]int64 `json:"prices"`
+  // Change for the last transaction
+  Change int64 `json:"change"`
 }
 
 func NewID() ThiefID {
@@ -39,5 +43,6 @@ type JobOffer struct {
   Origin string `json:"origin"`
   JobDescription string `json:"job_description"`
   ShoppingList []string `json:"shopping_list"`
+  Budget int64 `json:"price"`
 }
 

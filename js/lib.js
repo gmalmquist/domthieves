@@ -608,13 +608,20 @@ DT.Pirate = (item) => {
 };
 
 DT.Recruit = async (shoppingList) => {
+  const budget = DT.budget;
+  DT.budget = 0;
+
   let url = `/guild/${DT.guild}/recruit`;
   if (!isEmpty(shoppingList)) {
     const qargs = shoppingList.map(kind => `buy=${kind}`).join('&');
-    url = `${url}?${qargs}`;
+    url = `${url}?budget=${budget}&${qargs}`;
   }
 
   const meta = await DT.Fetch(url).then(r => r.json());
+  if (isSome(meta.change)) {
+    DT.budget += meta.change;
+  }
+
   const thief = {
     meta,
     task: null,
@@ -625,9 +632,15 @@ DT.Recruit = async (shoppingList) => {
     sackSize: 0,
   };
 
+  let haulcount = 0;
   if (!isEmpty(thief.meta.lootsack.items)) {
     thief.sack = [...thief.meta.lootsack.items];
     thief.sackSize = thief.sack.map(item => item.size).reduce((a, b) => a + b, 0);
+    haulcount = thief.sack.length;
+  }
+
+  if (!isEmpty(shoppingList) && haulcount < shoppingList.length) {
+    DT.budget++;
   }
 
   let size = 32; // ??
@@ -987,7 +1000,7 @@ DT.Recruit = async (shoppingList) => {
       setTimeout(() => DT.Anim.ReplaceElement(item.dom, ['centroid', spriteblock], target).then(el => {
         el.setAttribute(
           'title',
-          `Replacement for ${el.dataset.lootReplacementFor}, courtesy of ${thief.meta.name}. Originally stolen from ${item.home} by ${item.stolen_by}.`,
+          `Replacement for ${el.dataset.lootReplacementFor}, courtesy of ${thief.meta.name} for the price of ${item.price} WP (web pieces). Originally stolen from ${item.home} by ${item.stolen_by}.`,
         );
         el.removeAttribute('data-loot');
         el.removeAttribute('data-loot-kind');
@@ -1178,10 +1191,35 @@ DT.Recruit = async (shoppingList) => {
       return;
     }
 
-    const item = list[Math.floor(Math.random() * list.length)];
+    let valuables = [];
+    let highestValue = 0;
+    for (const item of list) {
+      let value = 0;
+      for (const use of item.item.uses) {
+        let price = thief.meta.prices[use];
+        if (isSome(price) && price > value) {
+          value = price;
+        }
+      }
+      item.value = value;
+      if (value < highestValue) {
+        continue;
+      }
+      if (value > highestValue) {
+        valuables = [];
+        highestValue = value;
+      }
+      valuables.push(item);
+    }
+
+    // we bias strongly to stealing more expensive stuff, but still sometimes
+    // grab other things.
+    const stealList = Math.random() < 0.1 ? list : valuables;
+
+    const item = stealList[Math.floor(Math.random() * stealList.length)];
     consideredItems[item.dom.dataset.lootId] = true;
 
-    console.log(thief.meta.name, 'is taking a look-see at', item.item.name);
+    console.log(thief.meta.name, 'is taking a look-see at', item.item.name, 'worth', item.value);
 
     thief.walkTo(item);
     thief.addTask(thief.newTask('appraising', () => {
@@ -1304,6 +1342,7 @@ DT.Initialize = async () => {
   DT.guild = 'global';
   DT.inventory = [];
   DT.thieves = [];
+  DT.budget = 0;
 
   console.log('⎽⎼⎻⎽⎼⎻⎽⎼⎻ DOM THIEVES ⎽⎼⎻⎽⎼⎻⎽⎼⎻');
   console.log(`====== API VERSION ${DT.ApiVersion} ======`);
@@ -1339,6 +1378,7 @@ DT.Initialize = async () => {
     });
 
     if (Math.random() < 0.10) {
+      // ask to be stolen from, lol.
       DT.Recruit();
     }
   }, 1000);

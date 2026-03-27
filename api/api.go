@@ -160,11 +160,12 @@ func (api *Api) Setup() {
     }
 
     q := r.URL.Query()
-
+    budget, _ := strconv.ParseInt(q.Get("budget"), 10, 64)
     offer := thief.JobOffer{
       Origin: origin,
       JobDescription: q.Get("job"),
       ShoppingList: q["buy"],
+      Budget: budget,
     }
 
     thief := guild.Recruit(offer)

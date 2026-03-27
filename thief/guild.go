@@ -33,6 +33,7 @@ type Guild struct {
   Culture string `json:"culture"`
   Thieves map[ThiefID]*Thief `json:"thieves"`
   Loot *LootTable `json:"loot"`
+  Coffers int64 `json:"coffers"`
   namegen *names.NameGen `json:"-"`
   idle deque.Deque[*Thief] `json:"-"`
   lock *sync.RWMutex `json:"-"`
@@ -40,7 +41,8 @@ type Guild struct {
 
 type LootTable struct {
   Items map[loot.LootID]*loot.Loot `json:"loot"`
-  uses map[loot.Use][]loot.LootID `json:"loot_by_use"`
+  Prices map[loot.Use]int64 `json:"prices"`
+  Uses map[loot.Use][]loot.LootID `json:"loot_by_use"`
 }
 
 func NewGuild(namegen *names.NameGen) *Guild {
@@ -58,7 +60,8 @@ func NewGuild(namegen *names.NameGen) *Guild {
 func NewLootTable() *LootTable {
   return &LootTable{
     Items: map[loot.LootID]*loot.Loot{},
-    uses: map[loot.Use][]loot.LootID{},
+    Prices: map[loot.Use]int64{},
+    Uses: map[loot.Use][]loot.LootID{},
   }
 }
 
@@ -111,6 +114,11 @@ func (g *Guild) Recruit(offer JobOffer) *Thief {
     }
   }
 
+  thief.Pricesheet = map[loot.Use]int64{}
+  for k, v := range g.Loot.Prices {
+    thief.Pricesheet[k] = v
+  }
+
   thief.Employer = offer.Origin
   thief.JobDescription = offer.JobDescription
 
@@ -127,6 +135,8 @@ func (g *Guild) Recruit(offer JobOffer) *Thief {
 
   thief.LootSack.Items = g.shopFor(&offer, thief)
 
+  thief.Change = offer.Budget
+
   now := time.Now()
   thief.RecruitedAt = now.Format(time.RFC3339)
   thief.LastTaskAt = now.Format(time.RFC3339)
@@ -142,7 +152,7 @@ func (g *Guild) shopFor(offer *JobOffer, thief *Thief) []*loot.Loot {
   cart := []*loot.Loot{}
   found := make([]bool, len(offer.ShoppingList))
   passedUp := -1
-  for attempt := 0; attempt < 6 && passedUp != 0 && len(cart) < len(offer.ShoppingList); attempt++ {
+  for attempt := 0; attempt < 6 && passedUp != 0 && len(cart) < len(offer.ShoppingList) && offer.Budget > 0; attempt++ {
     allowSameOrigin := attempt >= 3
     allowSameOriginAndThief := attempt == 5
     passedUp = 0
@@ -150,8 +160,23 @@ func (g *Guild) shopFor(offer *JobOffer, thief *Thief) []*loot.Loot {
       if found[i] || i > config.Conf.MaxShoppingList {
         continue
       }
-      arr, ok := g.Loot.uses[loot.Use(kind)]
+      u := loot.Use(kind)
+      arr, ok := g.Loot.Uses[u]
+      price := g.Loot.Prices[u]
+      if price <= 0 {
+        price = 1
+        g.Loot.Prices[u] = price
+      }
       if !ok || len(arr) == 0 {
+        // demand > supply
+        g.Loot.Prices[u] = price + 1
+        continue
+      }
+      if price > offer.Budget {
+        if price > 1 {
+          // supply > demand
+          g.Loot.Prices[u] = price - 1
+        }
         continue
       }
       idx := rand.Intn(len(arr))
@@ -172,11 +197,30 @@ func (g *Guild) shopFor(offer *JobOffer, thief *Thief) []*loot.Loot {
           continue
         }
       }
+      g.Coffers += price
+      pick.Price = price
       cart = append(cart, pick)
       slices.Delete(arr, idx, idx + 1)
       delete(g.Loot.Items, id)
       found[i] = true
+      offer.Budget -= price
     }
+  }
+  for _, kind := range offer.ShoppingList {
+    u := loot.Use(kind)
+    price := g.Loot.Prices[u]
+    if offer.Budget >= int64(len(offer.ShoppingList)) {
+      // if we get a high offer, raise prices to what they were willing to pay
+      price += offer.Budget / int64(len(offer.ShoppingList))
+    }
+    // price caps! blasted market regulations.
+    if price > config.Conf.PriceCap {
+      price = config.Conf.PriceCap
+    }
+    if price <= 0 {
+      price = 1
+    }
+    g.Loot.Prices[u] = price
   }
   return cart
 }
@@ -225,11 +269,11 @@ func (g *Guild) Deposit(item *loot.Loot) error {
   table.Items[item.ID] = item
 
   for use, _ := range uses {
-    arr, ok := table.uses[use]
+    arr, ok := table.Uses[use]
     if !ok {
-      table.uses[use] = []loot.LootID{ item.ID }
+      table.Uses[use] = []loot.LootID{ item.ID }
     } else {
-      table.uses[use] = append(arr, item.ID)
+      table.Uses[use] = append(arr, item.ID)
     }
   }
   return nil
@@ -267,3 +311,4 @@ func (d *Directory) Guild(id GuildID) (*Guild, bool) {
   g, ok := d.guilds[id]
   return g, ok
 }
+

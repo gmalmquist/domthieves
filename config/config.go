@@ -14,6 +14,7 @@ type Config struct {
   MaxRequestSize int64
   MaxShoppingList int
   MaxGuildSize int
+  PriceCap int64
 }
 
 func Default() *Config {
@@ -26,6 +27,7 @@ func Default() *Config {
     MaxRequestSize: 1024 * 128,
     MaxShoppingList: 3,
     MaxGuildSize: 20,
+    PriceCap: 300,
   }
 }
 
