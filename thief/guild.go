@@ -170,6 +170,7 @@ func (g *Guild) shopFor(offer *JobOffer, thief *Thief) []*loot.Loot {
       if !ok || len(arr) == 0 {
         // demand > supply
         g.Loot.Prices[u] = price + 1
+        found[i] = true // prevent a single transaction from driving the price to infinity
         continue
       }
       if price > offer.Budget {
@@ -177,6 +178,7 @@ func (g *Guild) shopFor(offer *JobOffer, thief *Thief) []*loot.Loot {
           // supply > demand
           g.Loot.Prices[u] = price - 1
         }
+        found[i] = true // prevent a single transaction from driving the price to zero
         continue
       }
       idx := rand.Intn(len(arr))
