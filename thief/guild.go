@@ -11,7 +11,6 @@ import (
 
   "hash/maphash"
   "math/rand"
-  "slices"
   "time"
 )
 
@@ -42,7 +41,8 @@ type Guild struct {
 type LootTable struct {
   Items map[loot.LootID]*loot.Loot `json:"loot"`
   Prices map[loot.Use]int64 `json:"prices"`
-  Uses map[loot.Use][]loot.LootID `json:"loot_by_use"`
+  LastBid map[loot.Use]time.Time `json:"lastbid"`
+  Uses map[loot.Use]map[loot.LootID]bool `json:"loot_by_use"`
 }
 
 func NewGuild(namegen *names.NameGen) *Guild {
@@ -61,7 +61,8 @@ func NewLootTable() *LootTable {
   return &LootTable{
     Items: map[loot.LootID]*loot.Loot{},
     Prices: map[loot.Use]int64{},
-    Uses: map[loot.Use][]loot.LootID{},
+    Uses: map[loot.Use]map[loot.LootID]bool{},
+    LastBid: map[loot.Use]time.Time{},
   }
 }
 
@@ -151,6 +152,7 @@ func (g *Guild) shopFor(offer *JobOffer, thief *Thief) []*loot.Loot {
   }
   cart := []*loot.Loot{}
   found := make([]bool, len(offer.ShoppingList))
+  // TODO refactor, this is so gross. sleepy code is bad code.
   passedUp := -1
   for attempt := 0; attempt < 6 && passedUp != 0 && len(cart) < len(offer.ShoppingList) && offer.Budget > 0; attempt++ {
     allowSameOrigin := attempt >= 3
@@ -161,13 +163,20 @@ func (g *Guild) shopFor(offer *JobOffer, thief *Thief) []*loot.Loot {
         continue
       }
       u := loot.Use(kind)
-      arr, ok := g.Loot.Uses[u]
+      idset, ok := g.Loot.Uses[u]
       price := g.Loot.Prices[u]
+      lastBid := g.Loot.LastBid[u]
+      now := time.Now()
+      if !lastBid.IsZero() && now.Sub(lastBid) > time.Minute {
+        // prices decay rapidly
+        price /= 2
+      }
+      g.Loot.LastBid[u] = now
       if price <= 0 {
         price = 1
         g.Loot.Prices[u] = price
       }
-      if !ok || len(arr) == 0 {
+      if !ok || len(idset) == 0 {
         // demand > supply
         g.Loot.Prices[u] = price + 1
         found[i] = true // prevent a single transaction from driving the price to infinity
@@ -181,12 +190,24 @@ func (g *Guild) shopFor(offer *JobOffer, thief *Thief) []*loot.Loot {
         found[i] = true // prevent a single transaction from driving the price to zero
         continue
       }
-      idx := rand.Intn(len(arr))
-      id := arr[idx]
+
+      // selecting a random value from a map is interesting
+      idx := rand.Intn(len(idset))
+      var id loot.LootID
+      for key := range idset {
+        if idx == 0 {
+          id = key
+        }
+        idx--
+      }
+      if id == loot.LootID("") {
+        // not found
+        continue
+      }
       pick, ok := g.Loot.Items[id]
       if !ok {
         // shouldn't have been in the list in the first place
-        slices.Delete(arr, idx, idx + 1)
+        delete(idset, id)
         continue
       }
       if pick.Home == offer.Origin {
@@ -199,11 +220,15 @@ func (g *Guild) shopFor(offer *JobOffer, thief *Thief) []*loot.Loot {
           continue
         }
       }
+      for _, use := range pick.Uses {
+        if set, ok := g.Loot.Uses[use]; ok {
+          delete(set, id)
+        }
+      }
       delete(g.Loot.Items, id)
       g.Coffers += price
       pick.Price = price
       cart = append(cart, pick)
-      slices.Delete(arr, idx, idx + 1)
       found[i] = true
       offer.Budget -= price
     }
@@ -271,12 +296,11 @@ func (g *Guild) Deposit(item *loot.Loot) error {
   table.Items[item.ID] = item
 
   for use, _ := range uses {
-    arr, ok := table.Uses[use]
+    _, ok := table.Uses[use]
     if !ok {
-      table.Uses[use] = []loot.LootID{ item.ID }
-    } else {
-      table.Uses[use] = append(arr, item.ID)
+      table.Uses[use] = map[loot.LootID]bool{}
     }
+    table.Uses[use][item.ID] = true
   }
   return nil
 }
