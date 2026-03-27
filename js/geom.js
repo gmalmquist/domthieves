@@ -305,3 +305,5 @@ Vec.project = (point, origin, normal) => {
   );
 };
 
+Vec.dist2 = (a, b) => Vec.mag2(Vec.sadd(a, -1, b));
+

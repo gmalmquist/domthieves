@@ -960,6 +960,35 @@ DT.Recruit = async (shoppingList) => {
         thief.asyncTask(thief.hideNametag());
         state.gottenClose = true;
       }
+      if (Vec.mag(vector) > 200) {
+        const tsize = Geom.getDocumentBoundingRect(spriteblock);
+        thief.asyncTask(thief.hideNametag());
+        thief.addAnimTask('abscond');
+        thief.addTask(thief.newTask('teleport', () => {
+          const bounds = Geom.getDocumentBoundingRect(el);
+          const vector = Geom.point([
+            ['centroid', bounds],
+            '-',
+            ['centroid', spriteblock],
+          ]);
+          let x = 0;
+          let y = 0;
+          if (vector.x < 0) {
+            x = bounds.right + tsize.width/2 + 4;
+          } else {
+            x = bounds.left - tsize.width/2 - 4;
+          }
+          if (vector.y < 0) {
+            y = bounds.bottom + tsize.height/2 + 4;
+          }
+          if (vector.y > 0) {
+            y = bounds.top - tsize.height/2 - 4;
+          }
+          thief.moveTo(x, y);
+        }));
+        thief.addAnimTask('appear');
+        return false;
+      }
       if (Math.round(Math.abs(vector.y)) > thief.anim.speedOf('walk-f')) {
         march(0, vector.y);
         return true;
@@ -1213,7 +1242,15 @@ DT.Recruit = async (shoppingList) => {
     // grab other things.
     const stealList = Math.random() < 0.1 ? list : valuables;
 
-    const item = stealList[Math.floor(Math.random() * stealList.length)];
+    const pos = Geom.point(['centroid', spriteblock]);
+    stealList.sort((a, b) => {
+      const pa = Geom.point(['centroid', a.dom]);
+      const pb = Geom.point(['centroid', b.dom]);
+      return Vec.dist2(pos, pa) - Vec.dist2(pos, pb);
+    });
+
+    // the power func makes us more likely to steal something closer
+    const item = stealList[Math.floor(Math.pow(Math.random(), 3) * stealList.length)];
     consideredItems[item.dom.dataset.lootId] = true;
 
     ldebug(thief.meta.name, 'is taking a look-see at', item.item.name, 'worth', item.value);

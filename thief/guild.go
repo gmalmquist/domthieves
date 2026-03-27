@@ -151,87 +151,72 @@ func (g *Guild) shopFor(offer *JobOffer, thief *Thief) []*loot.Loot {
     return nil
   }
   cart := []*loot.Loot{}
-  found := make([]bool, len(offer.ShoppingList))
-  // TODO refactor, this is so gross. sleepy code is bad code.
-  passedUp := -1
-  for attempt := 0; attempt < 6 && passedUp != 0 && len(cart) < len(offer.ShoppingList) && offer.Budget > 0; attempt++ {
-    allowSameOrigin := attempt >= 3
-    allowSameOriginAndThief := attempt == 5
-    passedUp = 0
-    for i, kind := range offer.ShoppingList {
-      if found[i] || i > config.Conf.MaxShoppingList {
-        continue
-      }
-      u := loot.Use(kind)
-      idset, ok := g.Loot.Uses[u]
-      price := g.Loot.Prices[u]
-      lastBid := g.Loot.LastBid[u]
-      now := time.Now()
-      if !lastBid.IsZero() && now.Sub(lastBid) > time.Minute {
-        // prices decay rapidly
-        price /= 2
-      }
-      g.Loot.LastBid[u] = now
-      if price <= 0 {
-        price = 1
-        g.Loot.Prices[u] = price
-      }
-      if !ok || len(idset) == 0 {
-        // demand > supply
-        g.Loot.Prices[u] = price + 1
-        found[i] = true // prevent a single transaction from driving the price to infinity
-        continue
-      }
-      if price > offer.Budget {
-        if price > 1 {
-          // supply > demand
-          g.Loot.Prices[u] = price - 1
-        }
-        found[i] = true // prevent a single transaction from driving the price to zero
-        continue
-      }
-
-      // selecting a random value from a map is interesting
-      idx := rand.Intn(len(idset))
-      var id loot.LootID
-      for key := range idset {
-        if idx == 0 {
-          id = key
-        }
-        idx--
-      }
-      if id == loot.LootID("") {
-        // not found
-        continue
-      }
-      pick, ok := g.Loot.Items[id]
-      if !ok {
-        // shouldn't have been in the list in the first place
-        delete(idset, id)
-        continue
-      }
-      if pick.Home == offer.Origin {
-        if !allowSameOrigin {
-          passedUp += 1
-          continue
-        }
-        if pick.StolenBy == thief.Name && !allowSameOriginAndThief {
-          passedUp += 1
-          continue
-        }
-      }
-      for _, use := range pick.Uses {
-        if set, ok := g.Loot.Uses[use]; ok {
-          delete(set, id)
-        }
-      }
-      delete(g.Loot.Items, id)
-      g.Coffers += price
-      pick.Price = price
-      cart = append(cart, pick)
-      found[i] = true
-      offer.Budget -= price
+  for i, kind := range offer.ShoppingList {
+    if i > config.Conf.MaxShoppingList {
+      continue
     }
+    u := loot.Use(kind)
+    idset, ok := g.Loot.Uses[u]
+    price := g.Loot.Prices[u]
+    lastBid := g.Loot.LastBid[u]
+    now := time.Now()
+
+    // halve prices if no one has bid on them for a while
+    if !lastBid.IsZero() && now.Sub(lastBid) > time.Minute {
+      price /= 2
+    }
+    g.Loot.LastBid[u] = now
+
+    if price <= 0 {
+      price = 1
+      g.Loot.Prices[u] = price
+    }
+
+    if !ok || len(idset) == 0 {
+      // we're out. demand > supply
+      g.Loot.Prices[u] = price + 1
+      continue
+    }
+
+    if price > offer.Budget {
+      if price > 1 {
+        // we've priced them out. supply > demand
+        g.Loot.Prices[u] = price - 1
+      }
+      continue
+    }
+
+    var pick *loot.Loot
+    // we randomly draw items from the list, getting less picky
+    // over time.
+    for attempt := 0; attempt < 6 && pick == nil; attempt++ {
+      allowSameOrigin := attempt >= 3
+      allowSameOriginAndThief := attempt == 5
+      // selecting a random value from a map is interesting
+      item, ok := g.Loot.PickRandom(u)
+      if !ok {
+        break // no options apparently
+      }
+      if item.Home == offer.Origin {
+        if allowSameOrigin {
+          continue
+        }
+        if item.StolenBy == thief.Name && !allowSameOriginAndThief {
+          continue
+        }
+      }
+      pick = item
+    }
+    if pick == nil {
+      continue
+    }
+
+    g.Loot.Remove(pick.ID)
+    
+    g.Coffers += price
+    pick.Price = price
+    cart = append(cart, pick)
+    offer.Budget -= price
   }
   for _, kind := range offer.ShoppingList {
     u := loot.Use(kind)
@@ -310,6 +295,41 @@ func (g *Guild) Json() []byte {
   defer g.lock.RUnlock()
   b, _ := jsv.Marshal(g)
   return b
+}
+
+func (lt *LootTable) UseCount(use loot.Use) int {
+  set, ok := lt.Uses[use]
+  if !ok {
+    return 0
+  }
+  return len(set)
+}
+
+func (lt *LootTable) PickRandom(use loot.Use) (*loot.Loot, bool) {
+  set, ok := lt.Uses[use]
+  if !ok || len(set) == 0 {
+    return nil, false
+  }
+  idx := rand.Intn(len(set))
+  for id, _ := range set {
+    if idx == 0 {
+      item, ok := lt.Items[id]
+      return item, ok
+    }
+    idx--
+  }
+  return nil, false
+}
+
+func (lt *LootTable) Remove(id loot.LootID) *loot.Loot {
+  item, ok := lt.Items[id]
+  if !ok {
+    return nil
+  }
+  for _, use := range item.Uses {
+    delete(lt.Uses[use], id)
+  }
+  return item
 }
 
 type Directory struct {
