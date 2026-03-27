@@ -13,10 +13,46 @@ DT.Fetch = async (path, args) => {
   if (!path.startsWith('/')) {
     path = '/' + path;
   }
-  return await fetch(`${DT.ApiRoot}${path}`, args);
+  if (isSome(args) && isSome(args.headers)) {
+    args = {
+      ...args,
+      headers: {
+        'X-Origin': window.location.origin,
+        ...args.headers,
+      },
+    };
+  }
+  const response = await fetch(`${DT.ApiRoot}${path}`, args);
+  if (isSome(response.headers)) {
+    const version = response.headers.get('X-Api-Version');
+    if (isSome(version)) {
+      if (DT.ApiVersion !== version) {
+        console.warn(`DOM Thieves JS Client Api Version (${DT.ApiVersion} does not match server version ${version}.`);
+      }
+    }
+  }
+  return response;
+};
+
+DT.SetElementStyle = (element, style) => {
+  const og = {};
+  for (const [key, value] of Object.entries(style)) {
+    og[key] = element.style[key];
+    element.style[key] = value;
+  }
+  return og;
 };
 
 DT.Anim = {};
+
+DT.Anim.Transition = (element, durationMillis, property, value) => {
+  console.log(element.dataset.lootId, durationMillis, property, value);
+  element.style.transitionDuration = `${durationMillis/1000.0}s`;
+  element.style.transitionProperty = property;
+  element.style[property] = value;
+  console.log(element, durationMillis, property, value);
+  return new Promise(r => setTimeout(r, durationMillis));
+};
 
 DT.Anim.TakeElement = async (element, target, args) => {
   args = firstNotNone(args, {});
@@ -70,11 +106,8 @@ DT.Anim.ReplaceElement = async (html, srcPoint, dstElement) => {
   phantom.style.position = 'absolute';
   phantom.style.userSelect = 'none';
   phantom.style.pointerEvents = 'none';
-  if (phantom.style.display === 'inline' || phantom.style.display === 'block') {
+  if (phantom.style.display === 'inline') {
     phantom.style.display = 'inline-block';
-  }
-  if (phantom.style === 'flex') {
-    phantom.style.display = 'inline-flex';
   }
 
   const px = x => `${x}px`;
@@ -113,7 +146,22 @@ DT.Anim.ReplaceElement = async (html, srcPoint, dstElement) => {
   }, durationMilli));
 
   const replacement = DT.Reify(html);
-  replacement.dataset.lootReplacement = dstElement.dataset.loot || dstElement.dataset.lootKind;
+  replacement.dataset.lootReplacementFor = DT.ItemName(dstElement);
+
+  const isAbsolute = el => {
+    for (let node = el; isSome(node) && node.tagName !== 'BODY'; node = node.parent) {
+      if (window.getComputedStyle(node).position === 'absolute') {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  if (isAbsolute(dstElement)) {
+    replacement.style.position = 'absolute';
+    replacement.style.left = bounds.left;
+    replacement.style.top = bounds.top;
+  }
 
   dstElement.replaceWith(replacement);
   phantom.remove();
@@ -121,7 +169,129 @@ DT.Anim.ReplaceElement = async (html, srcPoint, dstElement) => {
   return replacement;
 };
 
-DT.ForEachLootItem = (callback) => {
+DT.Anim.TugElement = async (tuggee, tugger) => {
+  const stepDurationMillis = 333;
+  const transitionDuration = `${stepDurationMillis/1000.0}s`;
+
+  const both = func => [func(tuggee), func(tugger)];
+
+  let [tuggeeStyle, tuggerStyle] = both(t => DT.SetElementStyle(t, {
+    transitionProperty: 'transform',
+    transitionDuration,
+    transitionTimingFunction: '',
+    transform: '',
+  }));
+
+  if (window.getComputedStyle(tuggee).display === 'inline') {
+    tuggeeStyle.display = tuggee.style.display;
+    tuggee.style.display = 'inline-block';
+  }
+
+  const tuggeeBounds = Geom.getDocumentBoundingRect(tuggee);
+  const baseOffset = Geom.point([
+    ['centroid', tugger],
+    '-',
+    ['centroid', tuggee],
+  ]);
+  const sign = baseOffset.x > 0 ? 1 : -1;
+  const peakAngle20px = Math.atan2(tuggeeBounds.height/2, 20) * 180 / Math.PI;
+  const peakAngle = Math.abs(peakAngle20px) > 30 ? 30 : peakAngle20px;
+
+  const stages = [
+    [0, ''],
+    [sign * peakAngle, 'ease-in'],
+    [sign * peakAngle * -0.15, 'ease-out'],
+    [0, ''],
+  ];
+
+  for (let i = 0; i < stages.length; i++) {
+    const [ degrees, timing ] = stages[i];
+    const radians = degrees * Math.PI / 180;
+
+    tuggee.style.transitionTimingFunction = timing;
+    tugger.style.transitionTimingFunction = timing;
+
+    const offx = tuggeeBounds.height * Math.tan(radians) / 2.0;
+
+    tuggee.style.transform = `skew(${degrees}deg)`;
+    tugger.style.transform = `translate(${offx}px, 0px)`;
+
+    await new Promise(r => setTimeout(r, stepDurationMillis));
+  }
+
+  DT.SetElementStyle(tuggee, tuggeeStyle);
+  DT.SetElementStyle(tugger, tuggerStyle);
+};
+
+DT.ItemKinds = item => {
+  if (item instanceof HTMLElement) {
+    const tagName = item.tagName.toLocaleLowerCase();
+    const allKinds = [];
+    if (isSome(item.dataset.lootKind)) {
+      item.dataset.lootKind.trim().split(/\s+/)
+        .filter(u => u.length > 0)
+        .map(u => u.toLocaleLowerCase())
+        .forEach(kind => allKinds.push(kind));
+    }
+    if (!isEmpty(item.dataset.loot)) {
+      allKinds.push(item.dataset.loot);
+    }
+    allKinds.push(tagName);
+    const uft = DT.UsesFromTag(tagName);
+    if (typeof uft === 'string') {
+      allKinds.push(uft);
+    } else if (Array.isArray(uft)) {
+      uft.forEach(u => allKinds.push(u));
+    }
+    const kinds = dedup(allKinds);
+    item.dataset.lootPrimaryKind = kinds[0];
+    return kinds;
+  }
+  if (!isEmpty(item.original_use)) {
+    return item.uses;
+  }
+  if (!isNone(item.item)) {
+    return item.item.uses;
+  }
+  return null;
+};
+
+DT.ItemKind = item => {
+  if (item instanceof HTMLElement && !isEmpty(item.dataset.lootPrimaryKind)) {
+    return item.dataset.lootPrimaryKind;
+  }
+  const kinds = DT.ItemKinds(item);
+  if (isEmpty(kinds)) {
+    return null;
+  }
+  return kinds[0];
+};
+
+DT.ItemName = item => {
+  if (item instanceof HTMLElement) {
+    if (!isEmpty(item.dataset.loot)) {
+      return item.dataset.loot;
+    }
+    const name = DT.ItemKind(item);
+    if (!isNone(name)) {
+      item.dataset.loot = name;
+      return name;
+    }
+    return null;
+  }
+  if (!isEmpty(item.name)) {
+    return item.name;
+  }
+  if (!isNone(item.item) && !isEmpty(item.item.name)) {
+    return item.item.name;
+  }
+  if (!isNone(item.dom)) {
+    return DT.ItemName(item.dom);
+  }
+  return null;
+};
+
+DT.ForEachLootItem = async (callback) => {
   const selectors = [
     '[data-loot]',
     '[data-loot-kind]',
@@ -134,7 +304,7 @@ DT.ForEachLootItem = (callback) => {
       if (dom.dataset.lootPhantom) {
         continue;
       }
-      const item = DT.AssessLootItem(dom);
+      const item = await DT.AssessLootItem(dom);
       if (isNone(item)) {
         continue;
       }
@@ -177,7 +347,7 @@ DT.AssessLoot = (loot) => {
   }
 };
 
-DT.AssessLootItem = dom => {
+DT.AssessLootItem = async dom => {
   if (!!dom.dataset.lootStolen) {
     return ALREADY_STOLEN;
   }
@@ -191,34 +361,13 @@ DT.AssessLootItem = dom => {
     return ALREADY_ASSESSED;
   }
 
-  const tagName = dom.tagName.toLocaleLowerCase();
-
-  const allKinds = [];
-  if (isSome(dom.dataset.lootKind)) {
-    dom.dataset.lootKind.trim().split(/\s+/)
-      .filter(u => u.length > 0)
-      .map(u => u.toLocaleLowerCase())
-      .forEach(kind => allKinds.push(kind));
-  }
-  if (!isEmpty(dom.dataset.loot)) {
-    allKinds.push(dom.dataset.loot);
-  }
-  allKinds.push(tagName);
-
-  const uft = DT.UsesFromTag(tagName);
-  if (typeof uft === 'string') {
-    allKinds.push(uft);
-  } else if (Array.isArray(uft)) {
-    uft.forEach(u => allKinds.push(u));
-  }
-
-  const uses = dedup(allKinds);
+  const uses = DT.ItemKinds(dom);
 
   if (uses.length === 0) {
     return USELESS;
   }
 
-  const copy = DT.CleanCopyDOM(dom);
+  const copy = await DT.CleanCopyDOM(dom);
   if (isNone(copy)) {
     return ILLEGAL_TAG;
   }
@@ -228,10 +377,7 @@ DT.AssessLootItem = dom => {
 
   const item = {
     id: '',
-    name: firstNotEmpty(
-      dom.dataset.loot,
-      ...uses,
-    ),
+    name: DT.ItemName(dom),
     dom: wrap.innerHTML,
     stolen_by: '',
     uses,
@@ -285,7 +431,7 @@ function* walkTreePair(aroot, broot) {
 };
 
 
-DT.CleanCopyDOM = original => {
+DT.CleanCopyDOM = async original => {
   switch (original.nodeType) {
     case Node.ELEMENT_NODE:
       break
@@ -319,7 +465,7 @@ DT.CleanCopyDOM = original => {
 
   if (!isNone(original.childNodes)) {
     for (const child of original.childNodes) {
-      const copy = DT.CleanCopyDOM(child);
+      const copy = await DT.CleanCopyDOM(child);
       if (isNone(copy)) {
         continue;
       }
@@ -327,27 +473,14 @@ DT.CleanCopyDOM = original => {
     }
   }
 
-  DT.BakeStyle(original, dom);
+  await DT.BakeStyle(original, dom);
   return dom;
 };
 
-DT.BakeStyle = (dom, copy) => {
-  const style = window.getComputedStyle(dom);
-  for (const prop of Object.values(style)) {
-    if (prop.startsWith('--')) {
-      if (!prop.startsWith('--moz') && !prop.startsWith('--webkit')) {
-        // avoid plugin-generated crud
-        continue;
-      }
-    }
-    if (style[prop] === 'auto') {
-      // this is almsot always the default
-      continue;
-    }
-    if (prop === 'z-index') {
-      continue;
-    }
-    copy.style[prop] = style[prop];
+DT.BakeStyle = async (dom, copy) => {
+  const style = await MinimalCSSFromElement(dom);
+  for (const [ name, value ] of Object.entries(style)) {
+    copy.style[name] = value;
   }
 };
 
@@ -375,13 +508,22 @@ DT.Reify = html => {
 };
 
 DT.PhantomClone = item => {
-  const place = Geom.getDocumentBoundingRect(item.dom);
+  let original = null;
+  let copy = null;
 
-  const wrap = document.createElement('div');
-  wrap.innerHTML = item.item.dom;
-  const copy = wrap.children[0];
-  copy.remove();
+  if (item instanceof HTMLElement) {
+    original = item;
+    copy = item.cloneNode(true);
+  } else if (isSome(item.item)) {
+    original = item.dom;
 
+    const wrap = document.createElement('div');
+    wrap.innerHTML = item.item.dom;
+    copy = wrap.children[0];
+    copy.remove();
+  }
+
+  const place = Geom.getDocumentBoundingRect(original);
   copy.dataset.lootPhantom = "true";
 
   copy.style.position = 'absolute';
@@ -397,7 +539,7 @@ DT.PhantomClone = item => {
   if (copy.innerHTML.trim() !== "") {
     // if this is a container, we need to make sure we use the min-contents
     // bounding rect.
-    switch (item.dom.style.display) {
+    switch (original.style.display) {
       case 'flex':
         copy.style.display = 'inline-flex';
         break;
@@ -419,6 +561,11 @@ DT.PhantomClone = item => {
     copy.style.maxWidth = `${place.width}px`;
     copy.style.maxHeight = `${place.height}px`;
 
+    const left = copy.style.left;
+    const right = copy.style.right;
+    copy.style.left = '-10000px';
+    copy.style.top = '0px';
+
     copy.style.opacity = '0';
     document.body.appendChild(copy);
     const rect = Geom.getDocumentBoundingRect(copy);
@@ -433,7 +580,9 @@ DT.PhantomClone = item => {
       copy.style.height = rect.height;
     }
     copy.remove();
-    copy.style.opacity = item.dom.style.opacity;
+    copy.style.opacity = original.style.opacity;
+    copy.style.left = left;
+    copy.style.top = top;
   }
   return copy;
 };
@@ -706,9 +855,9 @@ DT.Recruit = async (shoppingList) => {
     }
 
     if (dst.bottom < src.top - reach) {
-      dy = dst.bottom - (src.top - reach);
+      dy = dst.bottom - src.top;
     } else if (dst.top > src.bottom + reach) {
-      dy = dst.top - (src.bottom + reach);
+      dy = dst.top - src.bottom;
     }
 
     if (dst.bottom - src.height >= viewport.top && dst.bottom <= viewport.bottom) {
@@ -783,11 +932,11 @@ DT.Recruit = async (shoppingList) => {
       mustRemoveLater = true;
     }
     const state = {
-      dir: '',
       gottenClose: false,
     };
-    const march = (dir, dx, dy) => {
-      state.dir = dir;
+    const march = (x, y) => {
+      let sprite = thief.anim.getBestSprite(Sprites.BestVelocity({ x, y }));
+      const dir = isSome(sprite) ? sprite.name : '';
       if (dir === thief.anim.playing) {
         return;
       }
@@ -800,33 +949,20 @@ DT.Recruit = async (shoppingList) => {
         state.gottenClose = true;
       }
       if (Math.round(Math.abs(vector.y)) > thief.anim.speedOf('walk-f')) {
-        if (vector.y > 0) {
-          march('walk-f', 0, 1);
-        } else {
-          march('walk-b', 0, -1);
-        }
+        march(0, vector.y);
         return true;
+      } else {
+        thief.moveBy(0, vector.y);
       }
       if (Math.round(Math.abs(vector.x)) > thief.anim.speedOf('walk-r')) {
-        if (vector.x > 0) {
-          march('walk-r', 1, 0);
-        } else {
-          march('walk-l', -1, 0);
-        }
+        march(vector.x, 0);
         return true;
+      } else {
+        thief.moveBy(vector.x, 0);
       }
-      state.dir = '';
 
       const cv = thief.getCentroidDelta(el);
-      if (cv.x > 0) {
-        thief.play('stand-r');
-      } else if (cv.x < 0) {
-        thief.play('stand-l');
-      } else if (cv.y < 0) {
-        thief.play('stand-b');
-      } else {
-        thief.play('stand-f');
-      }
+      thief.playStand();
 
       if (mustRemoveLater) {
         el.remove();
@@ -847,21 +983,17 @@ DT.Recruit = async (shoppingList) => {
       if (isNone(target.dataset.lootStolen) || isNone(target.parentNode)) {
         return; // nothing to replace
       }
-      if (thief.anim.lastPlayed === 'stand-l' || thief.anim.lastPlayed === 'walk-l') {
-        thief.play('reach-l');
-      } else if (thief.anim.lastPlayed === 'stand-r' || thief.anim.lastPlayed === 'walk-r') {
-        thief.play('reach-r');
-      }
+      thief.playReach(target);
       setTimeout(() => DT.Anim.ReplaceElement(item.dom, ['centroid', spriteblock], target).then(el => {
         el.setAttribute(
           'title',
-          `Replacement for ${el.dataset.lootReplacement}, courtesy of ${thief.meta.name}. Originally stolen from ${item.home} by ${item.stolen_by}.`,
+          `Replacement for ${el.dataset.lootReplacementFor}, courtesy of ${thief.meta.name}. Originally stolen from ${item.home} by ${item.stolen_by}.`,
         );
         el.removeAttribute('data-loot');
         el.removeAttribute('data-loot-kind');
         el.removeAttribute('data-loot-stolen');
         el.removeAttribute('data-loot-stolen-by');
-        thief.play('stand-f');
+        thief.playStand();
         thief.sack = thief.sack.filter(x => x.id !== item.id);
         thief.sackSize = thief.sack.map(item => item.size).reduce((a, b) => a + b, 0);
       }));
@@ -876,6 +1008,10 @@ DT.Recruit = async (shoppingList) => {
     thief.addTask(thief.showNametag());
     thief.walkTo(item);
     thief.addTask(thief.hideNametag());
+    thief.addTask(thief.newTask('tug', () => {
+      thief.playReach(item.dom);
+      return DT.Anim.TugElement(item.dom, spriteblock);
+    }));
     thief.addTask(thief.newTask('taking', (dt) => {
       if (item.dom.dataset.lootStolen) {
         // already stolen
@@ -886,15 +1022,11 @@ DT.Recruit = async (shoppingList) => {
         console.log('no room for', item.size);
         return;
       }
-      if (thief.anim.lastPlayed === 'stand-l' || thief.anim.lastPlayed === 'walk-l') {
-        thief.play('reach-l');
-      } else if (thief.anim.lastPlayed === 'stand-r' || thief.anim.lastPlayed === 'walk-r') {
-        thief.play('reach-r');
-      }
+      thief.playReach(item.dom);
       item.dom.dataset.lootStolenBy = thief.meta.name;
       const el = DT.Pirate(item);
       setTimeout(() => DT.Anim.TakeElement(el, ['centroid', spriteblock]).then(() => {
-        thief.play('stand-f');
+        thief.playStand();
         item.item.stolen_by = thief.meta.name;
         item.item.stolenHere = true; // this value isn't persisted to the server
         thief.sack.push(item.item);
@@ -915,14 +1047,41 @@ DT.Recruit = async (shoppingList) => {
     thief.anim.playKind(animation, true);
   };
 
+  thief.playReach = (toward) => {
+    if (isSome(toward)) {
+      if (toward instanceof HTMLElement) {
+        toward = ['centroid', toward];
+      }
+      const delta = Geom.point([toward, '-', ['centroid', spriteblock]]);
+      if (delta.x >= 0) {
+        thief.play('reach-r');
+      } else {
+        thief.play('reach-l');
+      }
+      return;
+    }
+    if (thief.anim.lastPlayed === 'stand-l' || thief.anim.lastPlayed === 'walk-l') {
+      thief.play('reach-l');
+    } else if (thief.anim.lastPlayed === 'stand-r' || thief.anim.lastPlayed === 'walk-r') {
+      thief.play('reach-r');
+    }
+  };
+
+  thief.playStand = () => {
+    if (thief.anim.lastPlayed === 'reach-l' || thief.anim.lastPlayed === 'walk-l') {
+      thief.play('stand-l');
+    } else if (thief.anim.lastPlayed === 'reach-r' || thief.anim.lastPlayed === 'walk-r') {
+      thief.play('stand-r');
+    }
+  };
+
   thief.addAnimTask = (animation) => {
     if (isNone(thief.anim)) {
       return;
     }
-    thief.anim.play(animation, true);
-    thief.anim.stop();
-    thief.addTask(thief.newTask(animation, dt => {
-      return isSome(thief.anim) && !isEmpty(thief.anim.playing);
+    thief.addTask(thief.newTask(animation, () => {
+      thief.anim.playKind(animation, true);
+      return thief.anim.stop();
     }));
   };
 
@@ -975,7 +1134,7 @@ DT.Recruit = async (shoppingList) => {
         if (hole.dataset.lootPhantom) {
           continue;
         }
-        const kind = hole.dataset.lootKind;
+        const kind = DT.ItemKind(hole);
         if (isEmpty(kind)) {
           continue;
         }
@@ -1040,14 +1199,16 @@ DT.Recruit = async (shoppingList) => {
 
     const choice = Math.random() * 100;
     if (choice < 50) {
+      // do nothing
       return;
     }
 
-    thief.addTask(thief.showNametag());
     if (choice < 75) {
+      thief.addTask(thief.showNametag());
       thief.addAnimTask('idle');
       return;
     }
+
     thief.survey();
   };
 
@@ -1088,17 +1249,22 @@ DT.Recruit = async (shoppingList) => {
     task.frame++;
     task.firstFrame = task.frame === 1;
     task.duration = task.frame * dt;
-    
-    if (!task.action(dt, task)) {
+
+    const res = task.action(dt, task);
+    if (typeof res === 'object' && res instanceof Promise) {
+      task.action = () => true;
+      res.then(task.finish);
+    } else if (!res) {
       task.finish();
     }
   }, delay);
 
   const viewport = Geom.viewport();
+  const inset = 50;
 
   thief.moveTo(
-    viewport.x + Math.random() * viewport.width,
-    viewport.y + Math.random() * viewport.height,
+    viewport.x + inset + Math.random() * (viewport.width - inset * 2),
+    viewport.y + inset + Math.random() * (viewport.height - inset * 2),
   );
   thief.asyncTask(thief.showNametag());
 
@@ -1133,16 +1299,19 @@ DT.Initialize = async () => {
   DT.inventory = [];
   DT.thieves = [];
 
+  console.log('⎽⎼⎻⎽⎼⎻⎽⎼⎻ DOM THIEVES ⎽⎼⎻⎽⎼⎻⎽⎼⎻');
+  console.log(`====== API VERSION ${DT.ApiVersion} ======`);
   DT._surveyInt = setInterval(() => {
     if (DT.thieves.length > 0) {
       return;
     }
     const holes = [];
     for (const hole of document.querySelectorAll('[data-loot-stolen]')) {
-      if (hole.dataset.lootPhantom || isNone(hole.dataset.lootKind)) {
+      const kind = DT.ItemKind(hole);
+      if (hole.dataset.lootPhantom || isEmpty(kind)) {
         continue;
       }
-      holes.push(hole.dataset.lootKind);
+      holes.push(kind);
       if (holes.length > 3) {
         break;
       }
@@ -1151,14 +1320,18 @@ DT.Initialize = async () => {
       DT.Recruit(holes);
       return;
     }
+
     const list = [];
     DT.ForEachLootItem(item => {
       list.push(item);
+    }).then(() => {
+      if (list.length === 0) {
+        clearInterval(DT._surveyInt);
+        console.log('Terminating DOMThieves');
+        return;
+      }
     });
-    if (list.length === 0) {
-      clearInterval(DT._surveyInt);
-      return;
-    }
+
     if (Math.random() < 0.10) {
       DT.Recruit();
     }

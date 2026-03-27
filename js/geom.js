@@ -21,6 +21,60 @@ Geom.intersectRects = function(one, two) {
   n.height = n.bottom - n.top;
 }
 
+Geom.isRect = function(r) {
+  return isSome(r.left) && isSome(r.top) && isSome(r.width) && isSome(r.height);
+}
+
+Geom.closestPoint = function(point, obj) {
+  point = Geom.point(point);
+  while (typeof obj === 'function') {
+    obj = obj();
+  }
+
+  if (obj instanceof HTMLElement) {
+    obj = Geom.getDocumentBoundingRect(obj);
+  }
+
+  if (Geom.isRect(obj)) {
+    const { left, top, width, height } = obj;
+    const right = left + width;
+    const bottom = top + height;
+    let { x, y } = point;
+    if (x < left) {
+      x = left;
+    } else if (x > right) {
+      x = right;
+    }
+    if (y < top) {
+      y = top;
+    } else if (y > bottom) {
+      y = bottom;
+    }
+    return { x, y };
+  }
+
+  if (isSome(obj.x) && isSome(obj.y)) {
+    // closest point to a point is that point
+    const { x, y } = obj;
+    return { x, y };
+  }
+
+  if (isSome(obj.origin) && isSome(obj.normal)) {
+    // we have a line
+    return Vec.project(point, Geom.point(obj.origin), Geom.point(obj.normal));
+  }
+
+  if (isSome(obj.src) && isSome(obj.dst)) {
+    const src = Geom.point(obj.src);
+    const dst = Geom.point(obj.dst);
+    const normal = Vec.r90(Vec.sadd(src, -1, dst));
+    // we have a line, defined with endpoints
+    return Vec.project(point, src, normal);
+  }
+
+  throw new Error(`don't know how to calculate point closest to ${JSON.stringify(point)} on ${JSON.stringify(obj)}`);
+}
+
 Geom.cloneRect = function(rect) {
   const clone = {
     left: rect.left,
@@ -96,7 +150,10 @@ Geom.getVisibleBoundingRect = function(element) {
 
 Geom.Pt = (x, y) => ({ x, y });
 
-Geom.point = (spec) => {
+Geom.point = (spec, ...unwanted) => {
+  if (!isEmpty(unwanted)) {
+    throw new Error(`${unwanted.length} unexpected argument${unwanted.length === 1 ? '' : 's'} to Geom.point(${JSON.stringify(spec)}): ${JSON.stringify(unwanted)}`);
+  }
   const ANGLE = /^(?<num>\d+([.]\d*)?)(?<unit>rad|deg|°)$/i;
   let pt = spec;
   while (typeof pt === 'function') {
@@ -207,5 +264,51 @@ Geom.point = (spec) => {
     }
   }
   throw new Error(`Unrecognized point expression ${JSON.stringify(pt)}`);
+};
+
+const Vec = {};
+
+Vec.point = Geom.point;
+
+Vec.dot = (a, b) => {
+  return a.x * b.x + a.y * b.y;
+};
+
+Vec.det = (a, b) => {
+  return a.x * -b.y + a.y * b.x;
+};
+
+Vec.unit = p => {
+  const mag2 = p.x*p.x + p.y*p.y;
+  if (mag2 < 0.0001) {
+    return p;
+  }
+  const m = Math.sqrt(mag2);
+  return { x: p.x / mag, y: p.y / mag };
+};
+
+Vec.scale = (s, p) => {
+  v = Vec.point(p);
+  return { x: v.x * s, y: v.y * s };
+};
+
+Vec.add = (a, b) => {
+  return { x: a.x + b.x, y: a.y + b.y };
+};
+
+Vec.sadd = (a, s, b) => {
+  return { x: a.x + s * b.x, y: a.y + s * b.y };
+};
+
+Vec.r90 = ({x, y}) => ({x: -y, y: x});
+
+/** projects point onto the line defined by the origin and normal */
+Vec.project = (point, origin, normal) => {
+  // P + (PO * N)/(N*N) * N
+  return Vec.sadd(
+    point, 
+    Vec.dot(Vec.sadd(origin, -1, point), normal) / Vec.dot(normal, normal),
+    normal,
+  );
 };
 

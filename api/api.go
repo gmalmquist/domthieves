@@ -65,14 +65,23 @@ func (api *Api) Setup() {
   })
 
   mux.Handle("GET /domthieves.js", func(nu Nu) {
+    w, _ := nu.Unwrap()
+
     blob := bundle
     if config.Debug {
+      // in debug mode, live-update the js model with changes on disk
+      // instead of using the version loaded into memory for speed.
       blob = []byte(JsBundle())
     }
-    w, _ := nu.Unwrap()
+
     w.Header().Add("Content-Type", "application/javascript; charset=utf-8")
-    w.Header().Add("Content-Length", fmt.Sprintf("%v", len(blob)))
-    w.Write(blob)
+
+    w.Write([]byte("window.DOMThieves = (function() {\n"));
+    w.Write(blob);
+    w.Write([]byte("\n"))
+    w.Write([]byte(fmt.Sprintf("DT.ApiVersion = '%v';\n", Version)));
+    w.Write([]byte("return DT;\n"));
+    w.Write([]byte("})();\n"))
   })
 
   mux.Handle("GET /api/server/maxrequestsize", func(nu Nu) {

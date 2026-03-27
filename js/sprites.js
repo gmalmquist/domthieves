@@ -312,6 +312,7 @@ Sprites.inflate = blob => {
       anim.frameIndex = 0;
     }
     const offsetX = -sprite.first_frame_x - (sprite.frame_width * anim.frameIndex * sprite.play_direction);
+    anim.spriteview.style.opacity = '0';
     anim.spriteview.style.backgroundPosition = `${offsetX}px ${-sprite.first_frame_y}px`;
 
     const tick = {
@@ -332,6 +333,8 @@ Sprites.inflate = blob => {
         anim.tickers.push(ticker);
       }
     }
+
+    anim.spriteview.style.opacity = '1';
 
     if (anim.frameIndex === sprite.frame_count - 1 && sprite.loop_count !== 0) {
       if (isSome(anim.stopRequest)) {
@@ -359,6 +362,29 @@ Sprites.inflate = blob => {
     }, sprite.delay_milli[anim.frameIndex]);
   };
 
+  anim.playBestSprite = (scoreFunc) => {
+    const sprite = anim.getBestSprite(scoreFunc);
+    if (isSome(sprite)) {
+      anim.play(sprite.name);
+    }
+  };
+
+  anim.getBestSprite = (scoreFunc) => {
+    let best = null;
+    let highScore = 0;
+    for (const sprite of Object.values(anim.spritesheet.sprite_map)) {
+      let score = scoreFunc(sprite);
+      if (isNone(best) || score > highScore) {
+        best = sprite;
+        highScore = score;
+      }
+    }
+    if (isSome(highScore) && highScore <= 0) {
+      return null;
+    }
+    return best;
+  };
+
   anim.onFinish = () => new Promise(resolve => {
     if (isEmpty(anim.playing)) {
       resolve();
@@ -373,8 +399,15 @@ Sprites.inflate = blob => {
   };
 
   anim.stop = () => new Promise(resolve => {
+    if (isEmpty(anim.playing)) {
+      resolve();
+      return;
+    }
     anim.stopRequest = resolve;
   });
 
   return anim;
 };
+
+Sprites.BestVelocity = v => sprite => Vec.dot(Geom.point(v), sprite.movement.avg.velocity);
+
