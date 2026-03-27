@@ -189,11 +189,11 @@ DT.Anim.TugElement = async (tuggee, tugger) => {
 
   const tuggeeBounds = Geom.getDocumentBoundingRect(tuggee);
   const baseOffset = Geom.point([
-    ['centroid', tugger],
+    ['s', tugger],
     '-',
     ['centroid', tuggee],
   ]);
-  const sign = baseOffset.x > 0 ? 1 : -1;
+  let sign = baseOffset.x * baseOffset.y > 0 ? 1 : -1;
   const peakAngle20px = Math.atan2(tuggeeBounds.height/2, 20) * 180 / Math.PI;
   const peakAngle = Math.abs(peakAngle20px) > 30 ? 30 : peakAngle20px;
 
@@ -1036,15 +1036,20 @@ DT.Recruit = async (shoppingList) => {
     thief.addTask(thief.showNametag());
   };
 
-  thief.play = (animation) => {
+  thief.play = (animation, resolve) => {
+    if (isNone(resolve)) {
+      resolve = () => {};
+    }
     if (isNone(thief.anim)) {
+      resolve(false);
       return;
     }
     const playing = thief.anim.spritesheet.sprite_map[thief.anim.playing];
     if (isSome(playing) && playing.kinds.some(k => k === animation)) {
+      resolve(false);
       return;
     }
-    thief.anim.playKind(animation, true);
+    thief.anim.playKind(animation, true, resolve);
   };
 
   thief.playReach = (toward) => {
@@ -1077,12 +1082,13 @@ DT.Recruit = async (shoppingList) => {
 
   thief.addAnimTask = (animation) => {
     if (isNone(thief.anim)) {
+      console.warn('thief', thief.meta.name, 'is in want of a spritesheet');
       return;
     }
-    thief.addTask(thief.newTask(animation, () => {
-      thief.anim.playKind(animation, true);
-      return thief.anim.stop();
-    }));
+    thief.addTask(thief.newTask(animation, () => new Promise(resolve => {
+      thief.anim.playKind(animation, true, resolve);
+      thief.anim.stop();
+    })));
   };
 
   const returnToGuild = async () => {

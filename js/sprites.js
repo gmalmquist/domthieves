@@ -30,19 +30,37 @@ Sprites.FetchSheet = async (url, args) => {
     return null;
   }
 
-  const reversed = (arr) => {
-    if (isNone(arr)) {
-      return arr;
+  // handle copies
+  for (const [name, sprite] of Object.entries(spritesheet.sprite_map)) {
+    if (isEmpty(sprite.copy)) {
+      continue
     }
-    const rev = new Array(arr.length);
-    for (let i = 0; i < arr.length; i++) {
-      rev[arr.length - i - 1] = arr[i];
+    if (isEmpty(sprite.copy.src)) {
+      console.warn(`sprite ${spritesheet.url}:${name} specified 'copy' without a 'src'.`)
+      delete(spritesheet.sprite_map, name);
+      continue;
     }
-    return rev;
-  };
+    const src = spritesheet.sprite_map[sprite.copy.src];
+    if (isNone(src)) {
+      console.warn(`sprite ${spritesheet.url}:${name} could not locate src '${sprite.copy.src}'`)
+      delete(spritesheet.sprite_map, name);
+      continue;
+    }
+    let spr = { ...src, };
+    if (sprite.copy.reverse) {
+      spr.delay_milli = reversed(src.delay_milli);
+      spr.distance_moved_per_frame = reversed(src.distance_moved_per_frame);
+      spr.first_frame_x = src.first_frame_x + src.frame_width * (src.frame_count - 1);
+      spr.play_direction = isSome(src.play_direction) ? -src.play_direction : -1;
+    }
+    spritesheet.sprite_map[name] = {
+      ...spr,
+      name,
+      ...sprite,
+    };
+  }
 
   spritesheet.kinds = {};
-
   for (const sprite of Object.values(spritesheet.sprite_map)) {
     // default to scanning sprites left to right
     if (isNone(sprite.play_direction)) {
@@ -67,20 +85,6 @@ Sprites.FetchSheet = async (url, args) => {
     }
 
     Sprites.calcMovement(sprite);
-  }
-
-  if (isNone(spritesheet.sprite_map['abscond'])) {
-    // default to abscond being equal to the reverse of appear
-    const appear = spritesheet.sprite_map['appear'];
-    const abscond = {
-      ...appear,
-      name: 'abscond',
-      delay_milli: reversed(appear.delay_milli),
-      distance_moved_per_frame: reversed(appear.distance_moved_per_frame),
-      first_frame_x: appear.first_frame_x + appear.frame_width * (appear.frame_count - 1),
-      play_direction: -appear.play_direction,
-    };
-    spritesheet.sprite_map['abscond'] = abscond;
   }
 
   Sprites.sheets[url] = spritesheet;
@@ -269,35 +273,45 @@ Sprites.inflate = blob => {
     return sprite.movement.avg.speed;
   };
 
-  anim.playKind = (kind, interrupt) => {
-    if (isSome(anim.playing)) {
+  anim.playKind = (kind, interrupt, resolve) => {
+    if (isNone(resolve)) {
+      resolve = () => {};
+    }
+    if (!isEmpty(anim.playing)) {
       if (!interrupt) {
+        resolve(false);
         return false;
       }
       const sprite = anim.spritesheet.sprite_map[anim.playing];
       if (isSome(sprite) && sprite.kinds.some(k => k === kind)) {
+        resolve(false);
         return false;
       }
       anim.stop();
     }
     const options = anim.spritesheet.kinds[kind];
     if (isEmpty(options)) {
+      resolve(false);
       return false;
     }
     const animation = options[Math.floor(Math.random() * options.length)];
-    anim.play(animation);
-    return true;
+    anim.play(animation, resolve);
   };
 
-  anim.play = (name) => {
+  anim.play = (name, resolve) => {
+    if (isNone(resolve)) {
+      resolve = () => {};
+    }
     const first = !isEmpty(name) && name !== anim.playing;
     const sprite = !isEmpty(name) ? spritesheet.sprite_map[name] : spritesheet.sprite_map[anim.playing];
     if (isNone(sprite)) {
       if (!isEmpty(anim.playing)) {
         anim.stop();
+        resolve(false);
         return;
       }
       anim._finish(name);
+      resolve(false);
       return;
     }
     anim.playing = sprite.name;
@@ -344,21 +358,24 @@ Sprites.inflate = blob => {
         anim.stopRequest = null;
         anim.playing = '';
         anim._finish(sprite.name);
+        resolve(true);
         return
       }
       if (sprite.loop_count < 0 || anim.iter >= sprite.loop_count) {
         anim.playing = '';
         anim._finish(sprite.name);
+        resolve(true);
         return;
       }
     }
 
     setTimeout(() => {
       if (sprite.name !== anim.playing) {
+        resolve(true);
         return;
       }
       anim.frameIndex += 1;
-      anim.play(sprite.name);
+      anim.play(sprite.name, resolve);
     }, sprite.delay_milli[anim.frameIndex]);
   };
 
@@ -409,5 +426,23 @@ Sprites.inflate = blob => {
   return anim;
 };
 
-Sprites.BestVelocity = v => sprite => Vec.dot(Geom.point(v), sprite.movement.avg.velocity);
+Sprites.BestVelocity = targetVelocity => sprite => {
+  const v = Geom.point(targetVelocity);
+  // rather than the fastest animation we have in the given direction,
+  // we actually prefer the one 
+  const svel = sprite.movement.avg.velocity;
+  // f is essentially the multiples of the target velocity that the sprites's
+  // average velocity goes in. e.g., for `<2,0>` and `<-10, *>`, this value will
+  // be `-5.0`.
+  const f = Vec.dot(v, svel) / Vec.mag2(v);
+  if (f <= 0) {
+    return f;
+  }
+  // we actually *don't* want the greatest f, we want the f closest to 1.
+  if (f === 1.0) {
+    // prevent divide by zero
+    return Number.MAX_VALUE;
+  }
+  return 1.0 / Math.abs(f - 1.0);
+}
 

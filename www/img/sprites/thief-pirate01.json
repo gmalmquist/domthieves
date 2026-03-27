@@ -26,6 +26,12 @@
       ],
       "loop_count": -1
     },
+    "abscond": {
+      "copy": {
+        "src": "appear",
+        "reverse": true
+      }
+    },
     "reach-l": {
       "name": "reach-l",
       "frame_width": 16,

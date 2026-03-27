@@ -32,6 +32,18 @@ function firstNotEmpty(...args) {
   return '';
 }
 
+/** out of place reverse */
+const reversed = (arr) => {
+  if (isNone(arr)) {
+    return arr;
+  }
+  const rev = new Array(arr.length);
+  for (let i = 0; i < arr.length; i++) {
+    rev[arr.length - i - 1] = arr[i];
+  }
+  return rev;
+};
+
 function lerp(a, b, s) {
   return (1.0 - s) * a + s * b;
 }

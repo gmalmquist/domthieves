@@ -270,37 +270,30 @@ const Vec = {};
 
 Vec.point = Geom.point;
 
-Vec.dot = (a, b) => {
-  return a.x * b.x + a.y * b.y;
-};
+Vec.dot = (a, b) => (a.x * b.x + a.y * b.y);
+Vec.det = (a, b) => (a.x * -b.y + a.y * b.x);
+Vec.mag2 = v => (v.x * v.x + v.y * v.y);
+Vec.scale = (s, v) => ({ x: v.x * s, y: v.y * s });
+Vec.add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
+Vec.sadd = (a, s, b) => ({ x: a.x + s * b.x, y: a.y + s * b.y });
+Vec.r90 = ({x, y}) => ({x: -y, y: x});
 
-Vec.det = (a, b) => {
-  return a.x * -b.y + a.y * b.x;
+Vec.mag = v => {
+  const m2 = Vec.mag2(v);
+  if (m2 < 0.0001) {
+    return 0;
+  }
+  return Math.sqrt(m2);
 };
 
 Vec.unit = p => {
-  const mag2 = p.x*p.x + p.y*p.y;
-  if (mag2 < 0.0001) {
+  const mag = Vec.mag(p);
+  if (mag === 0) {
     return p;
   }
-  const m = Math.sqrt(mag2);
   return { x: p.x / mag, y: p.y / mag };
 };
 
-Vec.scale = (s, p) => {
-  v = Vec.point(p);
-  return { x: v.x * s, y: v.y * s };
-};
-
-Vec.add = (a, b) => {
-  return { x: a.x + b.x, y: a.y + b.y };
-};
-
-Vec.sadd = (a, s, b) => {
-  return { x: a.x + s * b.x, y: a.y + s * b.y };
-};
-
-Vec.r90 = ({x, y}) => ({x: -y, y: x});
 
 /** projects point onto the line defined by the origin and normal */
 Vec.project = (point, origin, normal) => {
