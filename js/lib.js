@@ -6,6 +6,7 @@ const USELESS = 'useless';
 const ILLEGAL_TAG = 'illegal_tag';
 const HIDDEN = 'hidden';
 const SACK_FULL = 'sack is full';
+const ABORTED = 'aborted';
 
 DT.ApiRoot = 'https://domthieves.gwen.run/api';
 
@@ -1102,7 +1103,7 @@ DT.Recruit = async (shoppingList) => {
     })));
   };
 
-  const returnToGuild = async () => {
+  thief.returnToGuild = async () => {
     for (const item of thief.sack) {
       const payload = JSON.stringify(item);
       const r = await DT.Fetch(`/guild/${thief.meta.guild}/deposit`, {
@@ -1136,9 +1137,7 @@ DT.Recruit = async (shoppingList) => {
       }
       clearInterval(thief.taskLoop);
       thief.node.remove();
-      setTimeout(() => {
-        returnToGuild();
-      },1);
+      setTimeout(thief.returnToGuild, 1);
       return false;
     }));
   }
@@ -1260,6 +1259,12 @@ DT.Recruit = async (shoppingList) => {
     return true;
   });
 
+  if (haulcount === 0 && !(await DT.IsThereLootLeft())) {
+    ldebug('no loot left and we have nothing to place, abort abort abort');
+    thief.returnToGuild();
+    return ABORTED;
+  }
+
   const delay = 20;
   const dt = (delay / 1000.0);
   thief.taskLoop = setInterval(() => {
@@ -1331,6 +1336,30 @@ DT.Offer = async (item) => {
   thief.take(item);
 };
 
+// for debugging
+DT.TrashAllLoot = () => {
+  ['data-loot', 'data-loot-kind'].forEach(attr => {
+    document.querySelectorAll(`[${attr}]`).forEach(e => e.removeAttribute(attr));
+  });
+};
+
+DT.MarkAllStolen = () => {
+  ['data-loot', 'data-loot-kind'].forEach(attr => {
+    document.querySelectorAll(`[${attr}]`).forEach(e => {
+      e.dataset.lootStolen = 'true';
+      e.dataset.lootStolenBy = 'Steve from Memecraft.';
+    });
+  });
+};
+
+DT.IsThereLootLeft = async () => {
+  const list = [];
+  await DT.ForEachLootItem(item => {
+    list.push(item);
+  });
+  return list.length > 0;
+};
+
 DT.Initialize = async () => {
   DT.allowedTags = await DT.Fetch('/allowhtml/tags').then(r => r.json());
   DT.deniedAttrs = await DT.Fetch('/denyhtml/attrs').then(r => r.json());
@@ -1341,11 +1370,18 @@ DT.Initialize = async () => {
   DT.inventory = [];
   DT.thieves = [];
   DT.budget = 0;
+  DT.enabled = true;
+  DT.mainLoopDelay = 1000;
 
-  const mainLoop = () => {
+  DT.mainLoop = async () => {
+    const loop = (mult) => setTimeout(DT.mainLoop, DT.mainLoopDelay * (isSome(mult) ? mult : 1));
     if (DT.thieves.length > 0) {
+      loop();
       return;
     }
+
+    const anyLootLeft = await DT.IsThereLootLeft();
+
     const holes = [];
     for (const hole of document.querySelectorAll('[data-loot-stolen]')) {
       const kind = DT.ItemKind(hole);
@@ -1358,44 +1394,46 @@ DT.Initialize = async () => {
       }
     }
     if (holes.length > 0) {
-      DT.Recruit(holes);
+      const res = await DT.Recruit(holes);
+      if (res === ABORTED) {
+        DT.budget += 10;
+        loop(10); // wait a long time before trying again, and increase our budget.
+        return;
+      }
+      loop();
       return;
     }
 
-    const list = [];
-    DT.ForEachLootItem(item => {
-      list.push(item);
-    }).then(() => {
-      if (list.length === 0) {
-        clearInterval(DT._surveyInt);
-        console.log('Terminating DOMThieves');
-        return;
-      }
-    });
+    if (!anyLootLeft) {
+      DT.enabled = false;
+      ldebug('No loot to steal, not loot to be stolen. Terminating DOMThieves');
+      return;
+    }
 
     if (Math.random() < 0.10) {
       // ask to be stolen from, lol.
       DT.Recruit();
     }
+    loop();
+    return;
   };
 
   DT.Disable = () => {
-    clearInterval(DT._surveyInt);
-    DT._surveyInt = null;
     DT.thieves.forEach(t => {
       t.taskQueue = [];
       t.abscond();
     });
     console.log('DOMThieves has been turned off. Run DOMThieves.Enable() to turn back on.');
+    DT.enabled = false;
   };
 
   DT.Enable = () => {
-    if (isSome(DT._surveyInt)) {
-      return;
-    }
     console.log('⎽⎼⎻⎽⎼⎻⎽⎼⎻ DOM THIEVES ⎽⎼⎻⎽⎼⎻⎽⎼⎻: To disable, run: DOMThieves.Disable()');
     ldebug(`====== API VERSION ${DT.ApiVersion} ======`);
-    DT._surveyInt = setInterval(mainLoop, 1000);
+
+    DT.wasLootLeft = true;
+    DT.enabled = true;
+    DT.mainLoop();
   };
 
   DT.Enable();

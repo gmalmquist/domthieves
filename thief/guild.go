@@ -199,11 +199,11 @@ func (g *Guild) shopFor(offer *JobOffer, thief *Thief) []*loot.Loot {
           continue
         }
       }
+      delete(g.Loot.Items, id)
       g.Coffers += price
       pick.Price = price
       cart = append(cart, pick)
       slices.Delete(arr, idx, idx + 1)
-      delete(g.Loot.Items, id)
       found[i] = true
       offer.Budget -= price
     }
