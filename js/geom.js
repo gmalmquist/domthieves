@@ -130,9 +130,19 @@ Geom.viewport = function() {
 }
 
 Geom.getDocumentBoundingRect = function(element) {
+  let fixed = false;
+  for (let node = element; isSome(node); node = node.parent) {
+    if (window.getComputedStyle(node).position === 'fixed') {
+      fixed = true;
+      break;
+    }
+  }
   const crect = element.getBoundingClientRect();
+  if (fixed) {
+    return crect;
+  }
   const view = Geom.viewport();
-  const bounds = {
+  return {
     left: crect.left + view.x,
     right: crect.right + view.x,
     top: crect.top + view.y,
@@ -140,7 +150,6 @@ Geom.getDocumentBoundingRect = function(element) {
     width: crect.width,
     height: crect.height,
   };
-  return bounds;
 }
 
 /* Clips the bounding rect to the viewport */

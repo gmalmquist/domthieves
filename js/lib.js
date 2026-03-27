@@ -44,6 +44,78 @@ DT.SetElementStyle = (element, style) => {
   return og;
 };
 
+DT.DrawBounds = (rect, opt) => {
+  if (!DT.Debug) {
+    return { remove: () => {} };
+  }
+  const state = { };
+  if (isNone(opt)) {
+    opt = { duration: 3000 };
+  }
+  if (typeof opt.alive === 'function') {
+    state.alive = opt.alive;
+  } else if (isSome(opt.promise)) {
+    opt.promise.then(() => {
+      state.done = true;
+    });
+    state.alive = () => !state.done;
+  } else if (isSome(opt.duration)) {
+    setTimeout(() => {
+      state.done = true;
+    }, opt.duration);
+    state.alive = () => !state.done;
+  } else {
+    state.alive = () => true;
+  }
+
+  const rectangle = document.createElement('div');
+  rectangle.dataset.debug = 'bounds';
+  rectangle.style.position = 'absolute';
+  rectangle.style.border = 'thin solid red';
+  rectangle.style.userSelect = 'none';
+  rectangle.style.pointerEvents = 'none';
+
+  const place = () => {
+    let r = rect;
+    while (typeof r === 'function') {
+      r = r();
+    }
+    if (r instanceof HTMLElement) {
+      r = Geom.getDocumentBoundingRect(r);
+    }
+    rectangle.style.left = `${r.left}px`;
+    rectangle.style.top = `${r.top}px`;
+    rectangle.style.width = `${r.width}px`;
+    rectangle.style.height = `${r.height}px`;
+  };
+
+  rectangle.style.opacity = 0;
+  rectangle.style.transitionProperty = 'opacity';
+  rectangle.style.transitionDuration = '0.5s';
+
+  const update = () => {
+    if (!state.alive()) {
+      rectangle.style.opacity = '0';
+      return;
+    }
+    place();
+    setTimeout(update, 20);
+  };
+
+  place();
+  document.body.appendChild(rectangle);
+  rectangle.style.opacity = '1';
+  update();
+
+  return {
+    state,
+    rectangle,
+    remove: () => {
+      state.alive = () => false;
+    },
+  };
+};
+
 DT.Anim = {};
 
 DT.Anim.Transition = (element, durationMillis, property, value) => {
@@ -762,6 +834,8 @@ DT.Recruit = async (shoppingList) => {
       duration: 0,
       frame: 0,
       state: 'ready',
+      finishes: [],
+      starters: [],
     };
 
     task.start = () => {
@@ -770,6 +844,9 @@ DT.Recruit = async (shoppingList) => {
       }
       task.state = 'running';
       thief.setStatus(task.name);
+      const starters = task.starters;
+      task.starters = [];
+      starters.forEach(s => s());
       return true;
     };
 
@@ -780,6 +857,9 @@ DT.Recruit = async (shoppingList) => {
       task.state = 'cancelled';
       thief.setStatus('idle');
       task.action = () => {};
+      const fin = task.finishes;
+      task.finishes = [];
+      fin.forEach(f => f());
       return true;
     };
 
@@ -789,6 +869,21 @@ DT.Recruit = async (shoppingList) => {
       }
       task.state = 'finished';
       return true;
+    };
+
+    task.onStart = (listener) => {
+      // we push the listener first to avoid races
+      task.starters.push(listener);
+      if (task.state !== 'ready') {
+        listener();
+      }
+    };
+
+    task.onFinish = (listener) => {
+      task.finishes.push(listener);
+      if (task.state !== 'ready' && task.state !== 'running') {
+        listener();
+      }
     };
 
     return task;
@@ -802,6 +897,9 @@ DT.Recruit = async (shoppingList) => {
 
   thief.addTask = task => {
     thief.taskQueue.push(task);
+    return new Promise(resolve => {
+      task.onFinish(resolve);
+    });
   };
 
   thief.asyncTask = task => {
@@ -1010,6 +1108,7 @@ DT.Recruit = async (shoppingList) => {
       }
       return false;
     });
+    task.onStart(() => task.onFinish(DT.DrawBounds(el).remove));
     thief.addTask(task);
   };
 
