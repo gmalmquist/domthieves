@@ -307,6 +307,22 @@ Geom.point = (spec, ...unwanted) => {
   throw new Error(`Unrecognized point expression ${JSON.stringify(pt)}`);
 };
 
+Geom.lazyPoint = async (args, ...unwanted) => {
+  if (unwanted.length > 0) {
+    // pass down the garbage in to get garbage out
+    return Geom.lazyPoint(args, ...unwanted);
+  }
+  args = await resolveLazy(args);
+  if (Array.isArray(args)) {
+    const pt = new Array(args.length);
+    for (let i = 0; i < args.length; i++) {
+      pt[i] = await resolveLazy(args[i]);
+    }
+    return Geom.point(pt);
+  }
+  return Geom.point(args);
+};
+
 const Vec = {};
 
 Vec.point = Geom.point;

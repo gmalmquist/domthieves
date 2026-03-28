@@ -123,3 +123,28 @@ function sameShape(one, two) {
   return true;
 }
 
+async function resolveLazy(v) {
+  while (true) {
+    if (typeof v === 'function') {
+      v = v();
+      continue;
+    }
+    if (v instanceof Promise) {
+      v = await v;
+      continue;
+    }
+    break;
+  }
+  return v;
+}
+
+function lazyFunc(f) {
+  return async function (...lazyArgs) {
+    const args = new Array(lazyArgs.length);
+    for (let i = 0; i < args.length; i++) {
+      args[i] = await resolveLazy(lazyArgs[i]);
+    }
+    return f(...args);
+  }
+};
+

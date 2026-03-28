@@ -62,8 +62,8 @@ DT.DrawPoint = (pt, opt) => {
       point.style.filter = 'invert(100%)';
       point.style.transform = 'translate(0px, 0px) rotate(0deg)';
     },
-    update: point => {
-      const a = Geom.point(pt);
+    update: async point => {
+      const a = await Geom.lazyPoint(pt);
       point.style.transform = `translate(${a.x}px, ${a.y}px)`;
       point.style.opacity = '1';
     },
@@ -82,9 +82,9 @@ DT.DrawLine = (src, dst, opt) => {
       line.style.width = '100px';
       line.style.transform = 'translate(0px, 0px) rotate(0deg)';
     },
-    update: line => {
-      const a = Geom.point(src);
-      const b = Geom.point(dst);
+    update: async line => {
+      const a = await Geom.lazyPoint(src);
+      const b = await Geom.lazyPoint(dst);
       const vector = Vec.sub(b, a);
       const center = Geom.point([a, 0.5, b]);
       if (Vec.mag2(vector) < 1.0) {
@@ -107,8 +107,8 @@ DT.DrawLine = (src, dst, opt) => {
 DT.DrawBounds = (rect, opt) => {
   return DT.Draw({
     ...firstNotNone(opt, {}),
-    update: rectangle => {
-      const r = Geom.rectOf(rect);
+    update: async rectangle => {
+      const r = Geom.rectOf(await resolveLazy(rect));
       rectangle.style.left = `${r.left}px`;
       rectangle.style.top = `${r.top}px`;
       rectangle.style.width = `${r.width}px`;
@@ -155,13 +155,16 @@ DT.Draw = (opt) => {
   drawing.style.transitionProperty = 'opacity';
   drawing.style.transitionDuration = '0.5s';
 
-  const update = () => {
+  const update = async () => {
     if (!state.alive()) {
       drawing.style.opacity = '0';
       return;
     }
     if (isSome(opt.update)) {
-      opt.update(drawing);
+      const u = opt.update(drawing);
+      if (u instanceof Promise) {
+        await u;
+      }
     }
     setTimeout(update, 20);
   };
@@ -619,6 +622,9 @@ DT.BakeStyle = async (dom, copy) => {
 };
 
 DT.getMinimumBoundingRect = async function(element) {
+  if (isEmpty(element.innerHTML)) {
+    return Geom.getDocumentBoundingRect(element);
+  }
   const display = window.getComputedStyle(element).display;
   const hypothetical = async (display) => {
     const wrap = document.createElement('div');
@@ -701,7 +707,7 @@ DT.Reify = html => {
   return wrap;
 };
 
-DT.PhantomClone = item => {
+DT.PhantomClone = async item => {
   let original = null;
   let copy = null;
 
@@ -710,80 +716,29 @@ DT.PhantomClone = item => {
     copy = item.cloneNode(true);
   } else if (isSome(item.item)) {
     original = item.dom;
-
     const wrap = document.createElement('div');
     wrap.innerHTML = item.item.dom;
     copy = wrap.children[0];
     copy.remove();
   }
 
-  const place = Geom.getDocumentBoundingRect(original);
+  const place = await DT.getMinimumBoundingRect(original);
   copy.dataset.lootPhantom = "true";
 
+  const px = x => `${x}px`;
   copy.style.position = 'absolute';
   copy.style.transitionProperty = '';
-  copy.style.left = `${place.left}px`;
-  copy.style.top = `${place.top}px`;
-  copy.style.margin = '0px';
-
-  if (copy.style.display === 'inline') {
-    copy.style.display = 'inline-block';
-  }
-
-  if (copy.innerHTML.trim() !== "") {
-    // if this is a container, we need to make sure we use the min-contents
-    // bounding rect.
-    switch (original.style.display) {
-      case 'flex':
-        copy.style.display = 'inline-flex';
-        break;
-      case 'grid':
-        copy.style.display = 'inline-grid';
-        break;
-      case 'table':
-        copy.style.display = 'inline-table';
-        break;
-      default:
-        copy.style.display = 'inline-block';
-        break;
-    }
-
-    // set the max values instead of the direct values, in case the element's inline size is
-    // smaller
-    copy.style.width = 'unset';
-    copy.style.height = 'unset';
-    copy.style.maxWidth = `${place.width}px`;
-    copy.style.maxHeight = `${place.height}px`;
-
-    const left = copy.style.left;
-    const right = copy.style.right;
-    copy.style.left = '-10000px';
-    copy.style.top = '0px';
-
-    copy.style.opacity = '0';
-    document.body.appendChild(copy);
-    const rect = Geom.getDocumentBoundingRect(copy);
-    if (rect.width === 0) {
-      copy.style.width = place.width;
-    } else {
-      copy.style.width = rect.width;
-    }
-    if (rect.height === 0) {
-      copy.style.height = place.height;
-    } else {
-      copy.style.height = rect.height;
-    }
-    copy.remove();
-    copy.style.opacity = original.style.opacity;
-    copy.style.left = left;
-    copy.style.top = top;
-  }
+  copy.style.left = px(place.left);
+  copy.style.top = px(place.top);
+  copy.style.width = px(place.width);
+  copy.style.height = px(place.height);
+  copy.style.margin = px(0);
   return copy;
 };
 
 // Pirating an item makes a copy of it, and hides the original.
-DT.Pirate = (item) => {
-  const copy = DT.PhantomClone(item);
+DT.Pirate = async (item) => {
+  const copy = await DT.PhantomClone(item);
 
   copy.setAttribute('title', `${item.item.name} is being stolen`);
 
@@ -1009,7 +964,32 @@ DT.Recruit = async (shoppingList) => {
       }
     };
 
+    task.step = async (...args) => {
+      if (isNone(task.action)) {
+        return false;
+      }
+      const result = task.action(...args);
+      if (result instanceof Promise) {
+        return await result;
+      }
+      return result;
+    };
+
     return task;
+  };
+
+  thief.newOneshotTask = (name, oneshot) => {
+    return thief.newTask(name, (_, task) => {
+      if (task.firstFrame) {
+        const res = oneshot();
+        if (res instanceof Promise) {
+          res.then(task.finish);
+          return true;
+        }
+        return false;
+      }
+      return true;
+    });
   };
 
   const idle = () => thief.newTask('idle', () => {
@@ -1026,16 +1006,18 @@ DT.Recruit = async (shoppingList) => {
   };
 
   thief.asyncTask = task => {
-    const dt = 0.02;
+    const delay = 20;
+    const dt = delay / 1000.0;
     task.frame = 0;
-    task._int = setInterval(() => {
+    const next = async () => {
       task.frame++;
       task.duration = task.frame * dt;
       task.firstFrame = task.frame === 1;
-      if (!task.action(dt, task)) {
-        clearInterval(task._int);
+      if (await task.step(dt, task)) {
+        setTimeout(next, delay);
       }
-    }, 20);
+    };
+    setTimeout(next, delay);
   };
 
   const centerOffset = () => {
@@ -1133,11 +1115,15 @@ DT.Recruit = async (shoppingList) => {
       thief.playStand();
       return false;
     });
-    task.onStart(() => {
-      const bounds = DT.DrawBounds(target);
-      const delta = DT.DrawLine(['south', spriteblock], ['south', target]);
-      task.onFinish(bounds.remove);
-      task.onFinish(delta.remove);
+    task.onStart(async () => {
+      const targetBounds = () => DT.getMinimumBoundingRect(target);
+      const thiefBounds = () => DT.getMinimumBoundingRect(spriteblock);
+      [
+        DT.DrawPoint(() => Geom.lazyPoint(['south', targetBounds])),
+        DT.DrawPoint(() => Geom.lazyPoint(['south', thiefBounds])),
+        DT.DrawBounds(async () => await DT.getMinimumBoundingRect(target)),
+        DT.DrawLine(async () => ['south', resolveLazy(thiefBounds)], ['south', resolveLazy(targetBounds)]),
+      ].map(d => d.remove).forEach(task.onFinish);
     });
     thief.addTask(task);
   };
@@ -1182,7 +1168,7 @@ DT.Recruit = async (shoppingList) => {
       thief.playReach(item.dom);
       return DT.Anim.TugElement(item.dom, spriteblock);
     }));
-    thief.addTask(thief.newTask('taking', (dt) => {
+    thief.addTask(thief.newTask('taking', async (dt) => {
       if (item.dom.dataset.lootStolen) {
         // already stolen
         ldebug(item.item.name, 'was already stolen');
@@ -1194,7 +1180,7 @@ DT.Recruit = async (shoppingList) => {
       }
       thief.playReach(item.dom);
       item.dom.dataset.lootStolenBy = thief.meta.name;
-      const el = DT.Pirate(item);
+      const el = await DT.Pirate(item);
       setTimeout(() => DT.Anim.TakeElement(el, ['centroid', spriteblock]).then(() => {
         thief.playStand();
         item.item.stolen_by = thief.meta.name;
@@ -1255,7 +1241,7 @@ DT.Recruit = async (shoppingList) => {
       console.warn('thief', thief.meta.name, 'is in want of a spritesheet');
       return;
     }
-    thief.addTask(thief.newTask(animation, () => new Promise(resolve => {
+    thief.addTask(thief.newOneshotTask(animation, () => new Promise(resolve => {
       thief.anim.playKind(animation, true, resolve);
       thief.anim.stop();
     })));
@@ -1293,7 +1279,7 @@ DT.Recruit = async (shoppingList) => {
       if (isSome(thief.anim)) {
         thief.anim.playing = '';
       }
-      clearInterval(thief.taskLoop);
+      thief.working = false;
       thief.node.remove();
       setTimeout(thief.returnToGuild, 1);
       return false;
@@ -1433,7 +1419,8 @@ DT.Recruit = async (shoppingList) => {
 
   const delay = 20;
   const dt = (delay / 1000.0);
-  thief.taskLoop = setInterval(() => {
+  thief.working = true;
+  thief.taskLoop = async () => {
     // housekeeping
     if (isSome(thief.anim)) {
       const sprite = thief.anim.spritesheet.sprite_map[thief.anim.playing];
@@ -1463,14 +1450,18 @@ DT.Recruit = async (shoppingList) => {
     task.firstFrame = task.frame === 1;
     task.duration = task.frame * dt;
 
-    const res = task.action(dt, task);
-    if (typeof res === 'object' && res instanceof Promise) {
-      task.action = () => true;
-      res.then(task.finish);
-    } else if (!res) {
+    if (!await task.step(dt, task)) {
       task.finish();
     }
-  }, delay);
+  };
+  const step = async () => {
+    if (thief.working) {
+      await thief.taskLoop();
+      setTimeout(step, delay);
+    }
+  };
+  setTimeout(step, delay);
+
 
   const viewport = Geom.viewport();
   const inset = 50;
