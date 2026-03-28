@@ -1,5 +1,371 @@
 // insane filename btw
 
+// https://www.w3schools.com/csSref/css_default_values.php
+const CSSDefaultValues = {
+  'A': {
+    _if: e => !isEmpty(e.getAttribute('href')),
+    'cursor': 'auto',
+    'text-decoration': 'underline',
+  },
+  'ADDRESS': {
+    'display': 'block',
+    'font-style': 'italic',
+  },
+  'AREA': {
+    'display': 'none',
+  },
+  'ASIDE': {
+    'display': 'block',
+  },
+  'B': {
+    'font-weight': 'bold',
+  },
+  'BDO': {
+    'unicode-bidi': 'bidi-override',
+  },
+  'BLOCKQUOTE': {
+    'display': 'block',
+    'margin-top': '1em',
+    'margin-bottom': '1em',
+    'margin-left': '40px',
+    'margin-right': '40px',
+  },
+  'BODY': {
+    'display': 'block',
+    'margin': '8px',
+  },
+  'CAPTION': {
+    'display': 'table-caption',
+    'text-align': 'center',
+  },
+  'CITE': {
+    'font-style': 'italic',
+  },
+  'CODE': {
+    'font-family': 'monospace',
+  },
+  'COL': {
+    'display': 'table-column',
+  },
+  'COLGROUP': {
+    'display': 'table-column-group',
+  },
+  'DATALIST': {
+    'display': 'none',
+  },
+  'DD': {
+    'display': 'block',
+    'margin-left': '40px',
+  },
+  'DEL': {
+    'text-decoration': 'line-through',
+  },
+  'DETAILS': {
+    'display': 'block',
+  },
+  'DFN': {
+    'font-style': 'italic',
+  },
+  'DIV': {
+    'display': 'block',
+  },
+  'DL': {
+    'display': 'block',
+    'margin-top': '1em',
+    'margin-bottom': '1em',
+    'margin-left': '0',
+    'margin-right': '0',
+  },
+  'DT': {
+    'display': 'block',
+  },
+  'EM': {
+    'font-style': 'italic',
+    'embed': 'focus',
+    'outline': 'none',
+  },
+  'FIELDSET': {
+    'display': 'block',
+    'margin-left': '2px',
+    'margin-right': '2px',
+    'padding-top': '0.35em',
+    'padding-bottom': '0.625em',
+    'padding-left': '0.75em',
+    'padding-right': '0.75em',
+    'border': '2px groove (internal value)',
+  },
+  'FIGCAPTION': {
+    'display': 'block',
+  },
+  'FIGURE': {
+    'display': 'block',
+    'margin-top': '1em',
+    'margin-bottom': '1em',
+    'margin-left': '40px',
+    'margin-right': '40px',
+  },
+  'FOOTER': {
+    'display': 'block',
+  },
+  'FORM': {
+    'display': 'block',
+    'margin-top': '0em',
+  },
+  'h1': {
+    'display': 'block',
+    'font-size': '2em',
+    'margin-top': '0.67em',
+    'margin-bottom': '0.67em',
+    'margin-left': '0',
+    'margin-right': '0',
+    'font-weight': 'bold',
+  },
+  'h2': {
+    'display': 'block',
+    'font-size': '1.5em',
+    'margin-top': '0.83em',
+    'margin-bottom': '0.83em',
+    'margin-left': '0',
+    'margin-right': '0',
+    'font-weight': 'bold',
+  },
+  'h3': {
+    'display': 'block',
+    'font-size': '1.17em',
+    'margin-top': '1em',
+    'margin-bottom': '1em',
+    'margin-left': '0',
+    'margin-right': '0',
+    'font-weight': 'bold',
+  },
+  'h4': {
+    'display': 'block',
+    'margin-top': '1.33em',
+    'margin-bottom': '1.33em',
+    'margin-left': '0',
+    'margin-right': '0',
+    'font-weight': 'bold',
+  },
+  'h5': {
+    'display': 'block',
+    'font-size': '.83em',
+    'margin-top': '1.67em',
+    'margin-bottom': '1.67em',
+    'margin-left': '0',
+    'margin-right': '0',
+    'font-weight': 'bold',
+  },
+  'h6': {
+    'display': 'block',
+    'font-size': '.67em',
+    'margin-top': '2.33em',
+    'margin-bottom': '2.33em',
+    'margin-left': '0',
+    'margin-right': '0',
+    'font-weight': 'bold',
+  },
+  'HEAD': {
+    'display': 'none',
+  },
+  'HEADER': {
+    'display': 'block',
+  },
+  'HR': {
+    'display': 'block',
+    'margin-top': '0.5em',
+    'margin-bottom': '0.5em',
+    'margin-left': 'auto',
+    'margin-right': 'auto',
+    'border-style': 'inset',
+    'border-width': '1px',
+  },
+  'HTML': {
+    'display': 'block',
+    'html': 'focus',
+    'outline': 'none',
+  },
+  'I': {
+    'font-style': 'italic',
+    'iframe': 'focus',
+    'outline': 'none',
+  },
+  'iframe': {
+    _if: e => e.hasAttribute('seamless'),
+    'display': 'block',
+  },
+  'IMG': {
+    'display': 'inline-block',
+  },
+  'INS': {
+    'text-decoration': 'underline',
+  },
+  'KBD': {
+    'font-family': 'monospace',
+  },
+  'LABEL': {
+    'cursor': 'default',
+  },
+  'LEGEND': {
+    'display': 'block',
+    'padding-left': '2px',
+    'padding-right': '2px',
+    'border': 'none',
+  },
+  'LI': {
+    'display': 'list-item',
+  },
+  'LINK': {
+    'display': 'none',
+  },
+  'MAP': {
+    'display': 'inline',
+  },
+  'MARK': {
+    'background-color': 'yellow',
+    'color': 'black',
+  },
+  'MENU': {
+    'display': 'block',
+    'list-style-type': 'disc',
+    'margin-top': '1em',
+    'margin-bottom': '1em',
+    'margin-left': '0',
+    'margin-right': '0',
+    'padding-left': '40px',
+  },
+  'NAV': {
+    'display': 'block',
+    'object': 'focus',
+    'outline': 'none',
+  },
+  'OL': {
+    'display': 'block',
+    'list-style-type': 'decimal',
+    'margin-top': '1em',
+    'margin-bottom': '1em',
+    'margin-left': '0',
+    'margin-right': '0',
+    'padding-left': '40px',
+  },
+  'OUTPUT': {
+    'display': 'inline',
+  },
+  'P': {
+    'display': 'block',
+    'margin-top': '1em',
+    'margin-bottom': '1em',
+    'margin-left': '0',
+    'margin-right': '0',
+  },
+  'PARAM': {
+    'display': 'none',
+  },
+  'PRE': {
+    'display': 'block',
+    'font-family': 'monospace',
+    'white-space': 'pre',
+    'margin': '1em 0',
+  },
+  'Q': {
+    'display': 'inline',
+  },
+  'RT': {
+    'line-height': 'normal',
+  },
+  'S': {
+    'text-decoration': 'line-through',
+  },
+  'SAMP': {
+    'font-family': 'monospace',
+  },
+  'SCRIPT': {
+    'display': 'none',
+  },
+  'SECTION': {
+    'display': 'block',
+  },
+  'SMALL': {
+    'font-size': 'smaller',
+  },
+  'SPAN': {
+    'display': 'inline',
+  },
+  'STRIKE': {
+    'text-decoration': 'line-through',
+  },
+  'STRONG': {
+    'font-weight': 'bold',
+  },
+  'STYLE': {
+    'display': 'none',
+  },
+  'SUB': {
+    'vertical-align': 'sub',
+    'font-size': 'smaller',
+  },
+  'SUMMARY': {
+    'display': 'block',
+  },
+  'SUP': {
+    'vertical-align': 'super',
+    'font-size': 'smaller',
+  },
+  'TABLE': {
+    'display': 'table',
+    'border-collapse': 'separate',
+    'border-spacing': '2px',
+    'border-color': 'gray',
+  },
+  'TBODY': {
+    'display': 'table-row-group',
+    'vertical-align': 'middle',
+    'border-color': 'inherit',
+  },
+  'TD': {
+    'display': 'table-cell',
+    'vertical-align': 'inherit',
+  },
+  'TFOOT': {
+    'display': 'table-footer-group',
+    'vertical-align': 'middle',
+    'border-color': 'inherit',
+  },
+  'TH': {
+    'display': 'table-cell',
+    'vertical-align': 'inherit',
+    'font-weight': 'bold',
+    'text-align': 'center',
+  },
+  'THEAD': {
+    'display': 'table-header-group',
+    'vertical-align': 'middle',
+    'border-color': 'inherit',
+  },
+  'TITLE': {
+    'display': 'none',
+  },
+  'TR': {
+    'display': 'table-row',
+    'vertical-align': 'inherit',
+    'border-color': 'inherit',
+  },
+  'U': {
+    'text-decoration': 'underline',
+  },
+  'UL': {
+    'display': 'block',
+    'list-style-type': 'disc',
+    'margin-top': '1em',
+    'margin-bottom': '1 em',
+    'margin-left': '0',
+    'margin-right': '0',
+    'padding-left': '40px',
+  },
+  'VAR': {
+    'font-style': 'italic',
+  },
+};
+
 // CSS Properties we always include
 const CSSAllowlist = new Set([
   'color',
@@ -13,6 +379,19 @@ const CSSDenylist = new Set([
   'perspective-origin',
   'transform-origin',
 ]);
+
+function getDefaultCSS(element, property) {
+  const def = CSSDefaultValues[property];
+  if (isNone(def) || (isSome(def._if) && !def._if(element))) {
+    return null;
+  }
+  return def[property];
+}
+
+function isDefaultCSS(element, property, value) {
+  const prop = getDefaultCSS(element, property);
+  return isSome(prop) && prop === value;
+}
 
 const CSSAllowFunc = (() => {
   const test = (val, x) => typeof x === 'function' ? x(val) : x === val;
@@ -68,6 +447,9 @@ async function MinimalCSSFromElement(el) {
 
   const accept = (name, value) => {
     if (CSSDenylist.has(name)) {
+      return false;
+    }
+    if (isDefaultCSS(el, name, value)) {
       return false;
     }
     if (empty) {

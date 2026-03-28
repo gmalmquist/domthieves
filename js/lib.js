@@ -10,7 +10,11 @@ const ABORTED = 'aborted';
 
 DT.ApiRoot = 'https://domthieves.gwen.run/api';
 
-DT.Fetch = async (path, args) => {
+DT.Fetch = async (path, args, opts) => {
+  opts = firstNotNone(opts, {});
+  opts.maxRetries = firstNotNone(opts.maxRetries, 4);
+  opts.retryDelay = firstNotNone(opts.retryDelay, 1000);
+
   if (!path.startsWith('/')) {
     path = '/' + path;
   }
@@ -23,16 +27,49 @@ DT.Fetch = async (path, args) => {
       },
     };
   }
-  const response = await fetch(`${DT.ApiRoot}${path}`, args);
-  if (isSome(response.headers)) {
-    const version = response.headers.get('X-Api-Version');
-    if (isSome(version)) {
-      if (DT.ApiVersion !== version) {
-        console.warn(`DOM Thieves JS Client Api Version (${DT.ApiVersion} does not match server version ${version}.`);
+
+  const attempt = async () => {
+    const response = await fetch(`${DT.ApiRoot}${path}`, args);
+    if (isSome(response.headers)) {
+      const version = response.headers.get('X-Api-Version');
+      if (isSome(version)) {
+        if (DT.ApiVersion !== version) {
+          console.warn(`DOM Thieves JS Client Api Version (${DT.ApiVersion} does not match server version ${version}.`);
+        }
       }
     }
+    return response;
+  };
+
+  for (let i = 0; i < opts.maxRetries; i++) {
+    const retryDelay = opts.retryDelay * Math.pow(2, i);
+    let err = null;
+    try {
+      const r = await attempt();
+      if (r.ok) {
+        return r;
+      }
+      err = { err: `${r.status}: ${r.statusText}` };
+      switch (err.status) {
+        case 408: // timeout
+        case 420: // try again later
+        case 423: // resource locked
+        case 429: // try again later
+        case 500: // server error
+        case 503: // service unavailable
+        case 504: // gateway timeout
+          err.retry = true;
+      }
+    } catch (e) {
+      err = { err, retry: true };
+    }
+    if (isSome(err)) {
+      if (err.retry && i >= opts.maxRetries - 1) {
+        throw new Error(e.err);
+      }
+      console.warn(`error fetching api ${DT.ApiRoot}/${path}$: ${e}, trying again in ${retryDelay/1000} seconds....`);
+    }
   }
-  return response;
 };
 
 DT.SetElementStyle = (element, style) => {
@@ -324,7 +361,7 @@ DT.Anim.TugElement = async (tuggee, tugger) => {
     tuggee.style.display = 'inline-block';
   }
 
-  const tuggeeBounds = await DT.getMinimumBoundingRect(tuggee);
+  const tuggeeBounds = await DOM.getMinimumBoundingRect(tuggee);
   const baseOffset = Geom.point([
     ['s', tugger],
     '-',
@@ -504,7 +541,7 @@ DT.AssessLootItem = async dom => {
     return USELESS;
   }
 
-  const copy = await DT.CleanCopyDOM(dom);
+  const copy = await DOM.CleanCopyDOM(dom);
   if (isNone(copy)) {
     return ILLEGAL_TAG;
   }
@@ -567,123 +604,6 @@ function* walkTreePair(aroot, broot) {
   }
 };
 
-
-DT.CleanCopyDOM = async original => {
-  switch (original.nodeType) {
-    case Node.ELEMENT_NODE:
-      break
-    case Node.TEXT_NODE:
-      return original.cloneNode(true);
-    case Node.ATTRIBUTE_NODE:
-      return original.cloneNode(true);
-    default:
-      return null;
-  }
-
-  if (!DT.allowedTags[original.tagName.toLocaleLowerCase()]) {
-    return null;
-  }
-
-  const dom = original.cloneNode(false);
-
-  for (const a of original.getAttributeNames()) {
-    const name = a.toLocaleLowerCase();
-    if (DT.deniedAttrs[name]) {
-      dom.removeAttribute(name);
-      continue;
-    }
-    for (const prefix of DT.deniedAttrPrefixes) {
-      if (name.startsWith(prefix)) {
-        dom.removeAttribute(name);
-        continue;
-      }
-    }
-  }
-
-  if (!isNone(original.childNodes)) {
-    for (const child of original.childNodes) {
-      const copy = await DT.CleanCopyDOM(child);
-      if (isNone(copy)) {
-        continue;
-      }
-      dom.appendChild(copy);
-    }
-  }
-
-  await DT.BakeStyle(original, dom);
-  return dom;
-};
-
-DT.BakeStyle = async (dom, copy) => {
-  const style = await MinimalCSSFromElement(dom);
-  for (const [ name, value ] of Object.entries(style)) {
-    copy.style[name] = value;
-  }
-};
-
-DT.getMinimumBoundingRect = async function(element) {
-  if (isEmpty(element.innerHTML)) {
-    return Geom.getDocumentBoundingRect(element);
-  }
-  const display = window.getComputedStyle(element).display;
-  const hypothetical = async (display) => {
-    const wrap = document.createElement('div');
-    wrap.style.position = 'absolute';
-    wrap.style.display = 'block';
-    wrap.style.left = '-500vw';
-    wrap.style.top = '1px';
-
-    const clone = await DT.CleanCopyDOM(element);
-    clone.style.display = display;
-    for (const a of clone.getAttributeNames()) {
-      if (a.startsWith('data-')) {
-        clone.removeAttribute(a);
-      }
-      if (a.startsWith('on')) {
-        clone.removeAttribute(a);
-      }
-    }
-    wrap.appendChild(clone);
-
-    document.body.appendChild(wrap);
-    const size = Geom.getDocumentBoundingRect(clone);
-    wrap.remove();
-    const pos = Geom.getDocumentBoundingRect(element);
-    return Geom.rectOf({
-      left: pos.left,
-      top: pos.top,
-      width: size.width,
-      height: size.height,
-    });
-  };
-
-  switch (display) {
-    case "inline":
-    case "inline-block":
-    case "inline-flex":
-    case "inline-grid":
-    case "inline list-item":
-    case "inline-table":
-      return Geom.getDocumentBoundingRect(element);
-    case "contents":
-    case "none":
-    case "flow-root":
-    case "block":
-      return await hypothetical("inline-block");
-    case "list-item":
-      return await hypothetical("inline list-item");
-    case "flex":
-      return await hypothetical("inline-flex")
-    case "grid":
-      return await hypothetical("inline-grid")
-    case "table":
-      return await hypothetical("inline-table")
-    default:
-      console.warn(`Unknown display type ${display}, assuming it's normal.`)
-      return Geom.getDocumentBoundingRect(element)
-  }
-};
-
 DT.LocateUse = use => {
   DT.FindLoot();
   for (const item of DT.inventory) {
@@ -722,7 +642,7 @@ DT.PhantomClone = async item => {
     copy.remove();
   }
 
-  const place = await DT.getMinimumBoundingRect(original);
+  const place = await DOM.getMinimumBoundingRect(original);
   copy.dataset.lootPhantom = "true";
 
   const px = x => `${x}px`;
@@ -1062,7 +982,7 @@ DT.Recruit = async (shoppingList) => {
     const calcGeometry = async () => {
       const feet = Geom.point(['south', spriteblock]);
       const thiefBounds = Geom.getDocumentBoundingRect(spriteblock);
-      const targetBounds = await DT.getMinimumBoundingRect(target);
+      const targetBounds = await DOM.getMinimumBoundingRect(target);
       const targetPoint = Geom.point(['south', targetBounds]);
       if (feet.x <= targetPoint.x) {
         targetPoint.x = targetBounds.left - thiefBounds.width - 4;
@@ -1115,12 +1035,12 @@ DT.Recruit = async (shoppingList) => {
       return false;
     });
     task.onStart(async () => {
-      const targetBounds = () => DT.getMinimumBoundingRect(target);
-      const thiefBounds = () => DT.getMinimumBoundingRect(spriteblock);
+      const targetBounds = () => DOM.getMinimumBoundingRect(target);
+      const thiefBounds = () => DOM.getMinimumBoundingRect(spriteblock);
       [
         DT.DrawPoint(() => Geom.lazyPoint(['south', targetBounds])),
         DT.DrawPoint(() => Geom.lazyPoint(['south', thiefBounds])),
-        DT.DrawBounds(async () => await DT.getMinimumBoundingRect(target)),
+        DT.DrawBounds(async () => await DOM.getMinimumBoundingRect(target)),
         DT.DrawLine(async () => ['south', resolveLazy(thiefBounds)], ['south', resolveLazy(targetBounds)]),
       ].map(d => d.remove).forEach(task.onFinish);
     });
@@ -1517,9 +1437,9 @@ DT.IsThereLootLeft = async () => {
 };
 
 DT.Initialize = async () => {
-  DT.allowedTags = await DT.Fetch('/allowhtml/tags').then(r => r.json());
-  DT.deniedAttrs = await DT.Fetch('/denyhtml/attrs').then(r => r.json());
-  DT.deniedAttrPrefixes = await DT.Fetch('/denyhtml/attr-prefixes').then(r => r.json());
+  DOM.allowedTags = await DT.Fetch('/allowhtml/tags').then(r => r.json());
+  DOM.deniedAttrs = await DT.Fetch('/denyhtml/attrs').then(r => r.json());
+  DOM.deniedAttrPrefixes = await DT.Fetch('/denyhtml/attr-prefixes').then(r => r.json());
   DT.maxRequestSize = await DT.Fetch('/server/maxrequestsize').then(r => r.json());
   DT.idleDelay = 500;
   DT.guild = 'global';
