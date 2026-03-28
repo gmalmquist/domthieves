@@ -324,7 +324,7 @@ DT.Anim.TugElement = async (tuggee, tugger) => {
     tuggee.style.display = 'inline-block';
   }
 
-  const tuggeeBounds = Geom.getDocumentBoundingRect(tuggee);
+  const tuggeeBounds = await DT.getMinimumBoundingRect(tuggee);
   const baseOffset = Geom.point([
     ['s', tugger],
     '-',
@@ -646,7 +646,7 @@ DT.getMinimumBoundingRect = async function(element) {
     wrap.appendChild(clone);
 
     document.body.appendChild(wrap);
-    const size = await DT.getMinimumBoundingRect(clone);
+    const size = Geom.getDocumentBoundingRect(clone);
     wrap.remove();
     const pos = Geom.getDocumentBoundingRect(element);
     return Geom.rectOf({
@@ -1059,13 +1059,30 @@ DT.Recruit = async (shoppingList) => {
       }
       thief.play(dir);
     };
-    const task = thief.newTask(`walking`, (dt) => {
+    const calcGeometry = async () => {
       const feet = Geom.point(['south', spriteblock]);
-      const targetBounds = Geom.getDocumentBoundingRect(target);
-      const targetPoint = Geom.point([feet, 'closest', targetBounds]);
-      targetPoint.y = targetBounds.bottom;
-      
+      const thiefBounds = Geom.getDocumentBoundingRect(spriteblock);
+      const targetBounds = await DT.getMinimumBoundingRect(target);
+      const targetPoint = Geom.point(['south', targetBounds]);
+      if (feet.x <= targetPoint.x) {
+        targetPoint.x = targetBounds.left - thiefBounds.width - 4;
+      } else {
+        targetPoint.x = targetBounds.right + thiefBounds.width + 4;
+      }
+      const view = Geom.viewport();
+      targetPoint.x = Math.max(targetPoint.x, view.left + thiefBounds.width/2);
+      targetPoint.x = Math.min(targetPoint.x, view.right - thiefBounds.width/2);
+      targetPoint.y = Math.max(targetPoint.y, 0 + thiefBounds.height);
       const vector = Geom.point([targetPoint, '-', feet]);
+      return {
+        src: { pt: feet, bounds: thiefBounds },
+        dst: { pt: targetPoint, bounds: targetBounds },
+        vector,
+      };
+    };
+    const task = thief.newTask(`walking`, async (dt) => {
+      const g = await calcGeometry();
+      const { vector } = g;
       if (!state.gottenClose && Math.abs(vector.x) + Math.abs(vector.y) < 50) {
         thief.asyncTask(thief.hideNametag());
         state.gottenClose = true;
@@ -1074,27 +1091,9 @@ DT.Recruit = async (shoppingList) => {
         const tsize = Geom.getDocumentBoundingRect(spriteblock);
         thief.asyncTask(thief.hideNametag());
         thief.addAnimTask('abscond');
-        thief.addTask(thief.newTask('teleport', () => {
-          const bounds = Geom.getDocumentBoundingRect(target);
-          const vector = Geom.point([
-            ['centroid', bounds],
-            '-',
-            ['centroid', spriteblock],
-          ]);
-          let x = 0;
-          let y = 0;
-          if (vector.x < 0) {
-            x = bounds.right + tsize.width/2 + 4;
-          } else {
-            x = bounds.left - tsize.width/2 - 4;
-          }
-          if (vector.y < 0) {
-            y = bounds.bottom + tsize.height/2 + 4;
-          }
-          if (vector.y > 0) {
-            y = bounds.top - tsize.height/2 - 4;
-          }
-          thief.moveTo(x, y);
+        thief.addTask(thief.newTask('teleport', async () => {
+          const g = await calcGeometry();
+          thief.moveTo(g.dst.pt.x, g.dst.pt.y - g.src.bounds.height/2);
         }));
         thief.addAnimTask('appear');
         return false;
@@ -1164,9 +1163,9 @@ DT.Recruit = async (shoppingList) => {
     thief.addTask(thief.showNametag());
     thief.walkTo(item.dom);
     thief.addTask(thief.hideNametag());
-    thief.addTask(thief.newTask('tug', () => {
+    thief.addTask(thief.newOneshotTask('tug', async () => {
       thief.playReach(item.dom);
-      return DT.Anim.TugElement(item.dom, spriteblock);
+      return await DT.Anim.TugElement(item.dom, spriteblock);
     }));
     thief.addTask(thief.newTask('taking', async (dt) => {
       if (item.dom.dataset.lootStolen) {
