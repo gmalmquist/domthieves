@@ -61,7 +61,11 @@ DOM.getMinimumBoundingRect = async function(element) {
   if (isEmpty(element.innerHTML)) {
     return Geom.getDocumentBoundingRect(element);
   }
-  const display = window.getComputedStyle(element).display;
+  let display = window.getComputedStyle(element).display;
+  if (isEmpty(display)) {
+    display = firstNotNone(getDefaultCSS(element, 'display'), 'inline');
+  }
+
   const hypothetical = async (display) => {
     const wrap = document.createElement('div');
     wrap.style.position = 'absolute';

@@ -61,13 +61,13 @@ DT.Fetch = async (path, args, opts) => {
           err.retry = true;
       }
     } catch (e) {
-      err = { err, retry: true };
+      err = { err: e, retry: true };
     }
     if (isSome(err)) {
       if (err.retry && i >= opts.maxRetries - 1) {
-        throw new Error(e.err);
+        throw new Error(err.err);
       }
-      console.warn(`error fetching api ${DT.ApiRoot}/${path}$: ${e}, trying again in ${retryDelay/1000} seconds....`);
+      console.warn(`error fetching api ${DT.ApiRoot}/${path}$: ${err.err}, trying again in ${retryDelay/1000} seconds....`);
     }
   }
 };
@@ -979,20 +979,39 @@ DT.Recruit = async (shoppingList) => {
       }
       thief.play(dir);
     };
+    const drawings = {
+      refs: [],
+      targetPoint: { x: -100, y: -100 },
+    };
+    drawings.refs.push(DT.DrawPoint(
+      () => drawings.targetPoint,
+      { stroke: '#0000ff' },
+    ));
     const calcGeometry = async () => {
       const feet = Geom.point(['south', spriteblock]);
       const thiefBounds = Geom.getDocumentBoundingRect(spriteblock);
       const targetBounds = await DOM.getMinimumBoundingRect(target);
       const targetPoint = Geom.point(['south', targetBounds]);
       if (feet.x <= targetPoint.x) {
-        targetPoint.x = targetBounds.left - thiefBounds.width - 4;
+        if (feet.x > targetBounds.left && targetBounds.width > thiefBounds.width * 2) {
+          targetPoint.x = lerp(targetBounds.left, targetPoint.x, 0.5);
+        } else {
+          targetPoint.x = targetBounds.left - thiefBounds.width - 4;
+        }
       } else {
-        targetPoint.x = targetBounds.right + thiefBounds.width + 4;
+        if (feet.x < targetBounds.right && targetBounds.width > thiefBounds.width * 2) {
+          targetPoint.x = lerp(targetBounds.right, targetPoint.x, 0.5);
+        } else {
+          targetPoint.x = targetBounds.right + thiefBounds.width + 4;
+        }
       }
       const view = Geom.viewport();
       targetPoint.x = Math.max(targetPoint.x, view.left + thiefBounds.width/2);
       targetPoint.x = Math.min(targetPoint.x, view.right - thiefBounds.width/2);
       targetPoint.y = Math.max(targetPoint.y, 0 + thiefBounds.height);
+
+      drawings.targetPoint = targetPoint;
+
       const vector = Geom.point([targetPoint, '-', feet]);
       return {
         src: { pt: feet, bounds: thiefBounds },
@@ -1043,6 +1062,9 @@ DT.Recruit = async (shoppingList) => {
         DT.DrawBounds(async () => await DOM.getMinimumBoundingRect(target)),
         DT.DrawLine(async () => ['south', resolveLazy(thiefBounds)], ['south', resolveLazy(targetBounds)]),
       ].map(d => d.remove).forEach(task.onFinish);
+    });
+    task.onFinish(() => {
+      drawings.refs.forEach(d => d.remove());
     });
     thief.addTask(task);
   };

@@ -204,6 +204,59 @@ T.TestPoint = async function() {
   await p;
 }
 
+T.TestColors = async function() {
+  const eq = (a, b, msg) => {
+    a = `${a}`.toLocaleUpperCase();
+    b = `${b}`.toLocaleUpperCase();
+    T.assert(a === b, `${msg}: expected ${a}, got ${b}`);
+  }
+  const checkX = (arg) => {
+    try {
+      const x = parseColor(arg);
+      T.assert(false, `expected an exception, but parse('${arg}') returned ${x}`);
+    } catch (e) {
+      // good
+      T.assert(true, `parseColor('${arg}') threw an exception, as expected.`);
+    }
+  };
+  const check = (expect, arg, msg) => {
+    try {
+      eq(expect.toLocaleLowerCase(), arg.toHex(), msg);
+    } catch (e) {
+      T.assert(false, `[${msg}] exception thrown ${e}`);
+    }
+  };
+
+  check('00FF8040', rgba(0, 255, 128, 64), 'toHex');
+  eq('#00FF8040', rgba(0, 255, 128, 64).toCSS(), 'toCSS');
+  check('00FF8040', parseColor('#00ff8040'), 'hex roundtrip');
+  check('FF8800FF', parseColor('#F80'), 'hex3');
+  check('FF8800FF', parseColor('#F80F'), 'hex4-F');
+  check('FF880000', parseColor('#F800'), 'hex4-0');
+  check('FF8800FF', parseColor('#FF8800'), 'hex6');
+  check('FF8800FF', parseColor('#FF8800FF'), 'hex8');
+  check('FF880088', parseColor('#FF880088'), 'hex8');
+  check('FF8000FF', parseColor('rgb(255, 128, 0)'), 'rgb()');
+  check('FF800080', parseColor('rgba(255, 128, 0, 128)'), 'rgba()');
+  check('000000FF', parseColor('black'), 'black');
+  check('FFFFFFFF', parseColor('white'), 'white');
+  check('FF0000FF', parseColor('red'), 'red');
+  check('008000FF', parseColor('green'), 'green');
+  check('0000FFFF', parseColor('blue'), 'blue');
+  check('00FFFFFF', parseColor('cyan'), 'cyan');
+  check('FF00FFFF', parseColor('magenta'), 'magenta');
+  check('FFFF00FF', parseColor('yellow'), 'yellow');
+  check('808080FF', parseColor('gray'), 'gray');
+  check('7FFFD4FF', parseColor('aquamarine'), 'aquamarine');
+
+  // these should throw exceptions
+  checkX('1');
+  checkX('21');
+  checkX('54321');
+  checkX('7654321');
+  checkX('987654321');
+}
+
 T.TestAll = async function() {
   const obj = T;
   for (const name of Object.keys(obj)) {
