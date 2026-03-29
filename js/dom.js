@@ -25,7 +25,7 @@ DOM.CleanClone = async original => {
   const urlAttrs = ['src', 'href'];
   for (const name of urlAttrs) {
     const value = original.getAttribute(name);
-    if (!isEmpty(value)) {
+    if (!isEmpty(value) && (value.startsWith("http://") || value.startsWith("https://"))) {
       const u = new URL(value, document.baseURI);
       dom.setAttribute(name, u.href);
     }

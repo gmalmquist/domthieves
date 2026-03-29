@@ -197,6 +197,9 @@ func checkElementNode(node *html.Node) error {
           return fmt.Errorf("400 dangerous event listener %v", name)
         }
       }
+      if name == "href" && (!strings.HasPrefix(a.Val, "https://") && !strings.HasPrefix(a.Val, "http://")){
+        return fmt.Errorf("may only link to http:// and https:// pages! illegal href: %v", a.Val)
+      }
     }
   }
   return nil
