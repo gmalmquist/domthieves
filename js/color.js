@@ -11,8 +11,18 @@ function rgba(r,g,b,a) {
   );
   c.toCSS = () => `#${c.toHex()}`;
   c.scale = s => rgba(r * s, g * s, b * s, a * s);
-  c.mul = o => rgba(r * o.r, g * o.g, b * o.b, a * o.a);
+  c.mul = o => rgba(r * o.r / 255, g * o.g / 255, b * o.b / 255, a * o.a / 255);
   c.add = o => rgba(r + o.r, g + o.g, b + o.b, a + o.a);
+  c.invert = o => rgba(255 - c.r, 255 - c.g, 255 - c.b, c.a);
+  c.clamp = () => {
+    c.r = Math.min(Math.max(c.r, 0), 255);
+    c.g = Math.min(Math.max(c.g, 0), 255);
+    c.b = Math.min(Math.max(c.b, 0), 255);
+    c.a = Math.min(Math.max(c.a, 0), 255);
+  };
+  c.clone = () => {
+    return rgba(...c.toArray());
+  };
   return c;
 }
 

@@ -82,9 +82,14 @@ DT.SetElementStyle = (element, style) => {
 };
 
 DT.DrawPoint = (pt, opt) => {
+  opt = firstNotNone(opt, {});
+  opt.stroke = parseColor(firstNotNone(opt.stroke, 'red'));
+  opt.fill = parseColor(firstNotNone(opt.fill, 'white'));
   return DT.Draw({
-    ...firstNotNone(opt, {}),
+    ...opt,
     setup: point => {
+      const stroke = opt.stroke.invert().toCSS();
+      const fill = opt.fill.invert().toCSS();
       const r = '4px';
       point.style.transitionProperty = 'transform';
       point.style.transitionDuration = '0.25s';
@@ -94,8 +99,8 @@ DT.DrawPoint = (pt, opt) => {
       point.style.width = `calc(${r} * 2)`;
       point.style.borderRadius = r;
       point.style.overflow = 'hidden';
-      point.style.backgroundColor = 'light-dark(black, black)';
-      point.style.borderColor = '#00ffff';
+      point.style.backgroundColor = `light-dark(${fill}, ${fill})`;
+      point.style.borderColor = stroke;
       point.style.filter = 'invert(100%)';
       point.style.transform = 'translate(0px, 0px) rotate(0deg)';
     },
@@ -985,7 +990,7 @@ DT.Recruit = async (shoppingList) => {
     };
     drawings.refs.push(DT.DrawPoint(
       () => drawings.targetPoint,
-      { stroke: '#0000ff' },
+      { stroke: 'blue' },
     ));
     const calcGeometry = async () => {
       const feet = Geom.point(['south', spriteblock]);
