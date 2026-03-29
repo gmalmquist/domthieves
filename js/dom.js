@@ -22,6 +22,15 @@ DOM.CleanClone = async original => {
 
   const dom = original.cloneNode(false);
 
+  const urlAttrs = ['src', 'href'];
+  for (const name of urlAttrs) {
+    const value = original.getAttribute(name);
+    if (!isEmpty(value)) {
+      const u = new URL(value, document.baseURI);
+      dom.setAttribute(name, u.href);
+    }
+  }
+
   for (const a of original.getAttributeNames()) {
     const name = a.toLocaleLowerCase();
     if (DOM.deniedAttrs[name]) {

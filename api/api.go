@@ -174,6 +174,11 @@ func (api *Api) Setup() {
     nu.ReplyJson(thief)
   })
 
+  mux.Handle("OPTIONS /api/guild/{gid}/return/{tid}", func(nu Nu) {
+    w, _ := nu.Unwrap()
+    w.WriteHeader(200)
+  })
+
   mux.Handle("POST /api/guild/{gid}/return/{tid}", func(nu Nu) {
     _, r := nu.Unwrap()
     gid := thief.GuildID(r.PathValue("gid"))
@@ -189,6 +194,10 @@ func (api *Api) Setup() {
     nu.ReplyPlaintext("welcome home! :)")
   })
 
+  mux.Handle("OPTIONS /api/guild/{gid}/deposit", func(nu Nu) {
+    w, _ := nu.Unwrap()
+    w.WriteHeader(200)
+  })
   mux.Handle("POST /api/guild/{gid}/deposit", func(nu Nu) {
     w, r := nu.Unwrap()
 

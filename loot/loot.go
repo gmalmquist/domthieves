@@ -14,7 +14,6 @@ var DenyAttrPrefixes = []string{ "on", "data-", "hx-" }
 
 var DenyAttributes = mkset( 
   "class",
-  "href",
   "id",
   "name",
 )
