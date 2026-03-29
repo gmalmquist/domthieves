@@ -639,10 +639,10 @@ DT.BindLinkWarnings = function(node, remote, thief) {
             This link is loot "stolen" from another website by <a href="https://domthieves.gwen.run">DOM thief</a> ${thief};
             it was originally from <a href="${remote}">${remote}</a>. The maintainers of the website you are currently on have <em>not</em> verified that it is safe; please only proceed if you trust the remote website.
             <p>If you click 'proceed', you will continue on your merry way to:
-            <a href="${href}">$href{}</a>
+            <a href="${href}">${href}</a>
           `,
           onConfirm: () => {
-            window.location = href;
+            window.open(href, '_blank').focus();
           },
           confirmLabel: 'Proceed',
           cancelLabel: 'Cancel',
