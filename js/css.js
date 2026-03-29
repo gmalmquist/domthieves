@@ -1,7 +1,23 @@
 // insane filename btw
 
+const CSS = {};
+
+// CSS Properties we always include
+CSS.Allowlist = new Set([
+  'color',
+  'font-family',
+  'font-weight',
+  'font-size',
+]);
+
+CSS.Denylist = new Set([
+  'z-index',
+  'perspective-origin',
+  'transform-origin',
+]);
+
 // https://www.w3schools.com/csSref/css_default_values.php
-const CSSDefaultValues = {
+CSS.DefaultValues = {
   'A': {
     _if: e => !isEmpty(e.getAttribute('href')),
     'cursor': 'auto',
@@ -356,7 +372,7 @@ const CSSDefaultValues = {
     'display': 'block',
     'list-style-type': 'disc',
     'margin-top': '1em',
-    'margin-bottom': '1 em',
+    'margin-bottom': '1em',
     'margin-left': '0',
     'margin-right': '0',
     'padding-left': '40px',
@@ -366,34 +382,103 @@ const CSSDefaultValues = {
   },
 };
 
-// CSS Properties we always include
-const CSSAllowlist = new Set([
-  'color',
-  'font-family',
-  'font-weight',
-  'font-size',
-]);
+CSS.MeasureUnits = async () => {
+  const el = document.createElement('div');
+  el.style.position = 'absolute';
+  el.style.left = 'calc(1vw * 1.0)';
+  el.style.top = 'calc(1vh * 1.0)';
+  el.style.width = 'calc(1rem * 1.0)';
+  el.style.height = '1ex';
+  el.style.userSelect = 'none';
+  el.style.pointerEvents = 'none';
+  el.style.backgroundColor = 'white';
+  el.style.opacity = '0';
 
-const CSSDenylist = new Set([
-  'z-index',
-  'perspective-origin',
-  'transform-origin',
-]);
+  document.body.appendChild(el);
+  await new Promise(r => setTimeout(r, 10));
+
+  const calc = window.getComputedStyle(el);
+  
+  function parsePx(x) {
+    if (typeof x === 'string' && x.endsWith('px')) {
+      return parseFloat(x.substring(0, x.length - 2));
+    }
+    return x;
+  }
+
+  const units = {
+    'vw': calc.left,
+    'vh': calc.top,
+    'rem': calc.width,
+    'em': calc.width,
+    'ex': calc.height,
+    'black': calc.color,
+    'white': calc.backgroundColor,
+  };
+  for (const [key, val] of Object.entries(units)) {
+    units[key] = parsePx(val);
+  }
+  el.remove();
+
+  CSS.units = units;
+  return units;
+};
+setTimeout(CSS.MeasureUnits, 10);
+
+CSS.toAbsoluteUnits = value => {
+  if (isEmpty(value)) {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return number;
+  }
+  value = typeof value === 'string' ? value : `${value}`;
+  const known = ['vw', 'vh', 'rem', 'em', 'ex'];
+  for (const unit of known) {
+    if (value.ensdWith(unit)) {
+      const s = value.substring(0, value.length - unit.length);
+      const pixels = parseFloat(s) * CSS.units[unit];
+      return `${pixels}px`;
+    }
+  }
+  return value;
+};
 
 function getDefaultCSS(element, property) {
-  const def = CSSDefaultValues[property];
+  const def = CSS.DefaultValues[property];
   if (isNone(def) || (isSome(def._if) && !def._if(element))) {
     return null;
   }
-  return def[property];
+  const value = def[property];
+  if (isEmpty(value)) {
+    return value;
+  }
+  if (property === 'color' || property.endsWith('-color')) {
+    if (isSome(CSS.units[value])) {
+      return CSS.units[value];
+    }
+  }
+  return value;
 }
 
 function isDefaultCSS(element, property, value) {
   const prop = getDefaultCSS(element, property);
-  return isSome(prop) && prop === value;
+  if (!isSome(prop)) {
+    return false;
+  }
+  if (property === 'color' || property.endsWith('-color')) {
+    try {
+      const a = parseColor(prop).toHex();
+      const b = parseColor(value).toHex();
+      return a.toHex() === b.toHex();
+    } catch (_) {
+      return false;
+    }
+  }
+  return CSS.toAbsoluteUnits(prop) === CSS.toAbsoluteUnits(value);
 }
 
-const CSSAllowFunc = (() => {
+CSS.AllowFunc = (() => {
   const test = (val, x) => typeof x === 'function' ? x(val) : x === val;
   const not = (...deny) => (val) => deny.every(deny => !test(val, deny));
   const is = (...allow) => (val) => allow.some(a => test(val, a));
@@ -446,7 +531,7 @@ async function MinimalCSSFromElement(el) {
   const defaults = window.getComputedStyle(plain);
 
   const accept = (name, value) => {
-    if (CSSDenylist.has(name)) {
+    if (CSS.Denylist.has(name)) {
       return false;
     }
     if (isDefaultCSS(el, name, value)) {
@@ -459,12 +544,12 @@ async function MinimalCSSFromElement(el) {
     if (defaults[name] !== value) {
       return true;
     }
-    if (CSSAllowlist.has(name)) {
+    if (CSS.Allowlist.has(name)) {
       return true;
     }
     const allowFuncs = [
-      CSSAllowFunc[name],
-      CSSAllowFunc[`${el.tagName}.${name}`],
+      CSS.AllowFunc[name],
+      CSS.AllowFunc[`${el.tagName}.${name}`],
     ];
     if (allowFuncs.some(func => isSome(func) && func(value))) {
       return true;

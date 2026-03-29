@@ -4,7 +4,7 @@ const DOM = {
   deniedAttrPrefixes: {},
 };
 
-DOM.CleanCopyDOM = async original => {
+DOM.CleanClone = async original => {
   switch (original.nodeType) {
     case Node.ELEMENT_NODE:
       break
@@ -38,7 +38,7 @@ DOM.CleanCopyDOM = async original => {
 
   if (!isNone(original.childNodes)) {
     for (const child of original.childNodes) {
-      const copy = await DOM.CleanCopyDOM(child);
+      const copy = await DOM.CleanClone(child);
       if (isNone(copy)) {
         continue;
       }
@@ -73,7 +73,7 @@ DOM.getMinimumBoundingRect = async function(element) {
     wrap.style.left = '-500vw';
     wrap.style.top = '1px';
 
-    const clone = await DOM.CleanCopyDOM(element);
+    const clone = await DOM.CleanClone(element);
     clone.style.display = display;
     for (const a of clone.getAttributeNames()) {
       if (a.startsWith('data-')) {

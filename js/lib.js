@@ -541,7 +541,7 @@ DT.AssessLootItem = async dom => {
     return USELESS;
   }
 
-  const copy = await DOM.CleanCopyDOM(dom);
+  const copy = await DOM.CleanClone(dom);
   if (isNone(copy)) {
     return ILLEGAL_TAG;
   }
@@ -1470,6 +1470,9 @@ DT.Initialize = async () => {
   DT.budget = 0;
   DT.enabled = true;
   DT.mainLoopDelay = 1000;
+
+  DT.DOM = DOM;
+  DT.Geom = Geom;
 
   DT.mainLoop = async () => {
     const loop = (mult) => setTimeout(DT.mainLoop, DT.mainLoopDelay * (isSome(mult) ? mult : 1));
