@@ -569,3 +569,18 @@ async function MinimalCSSFromElement(el) {
   return style;
 }
 
+CSS.PushStyle = function(element, style) {
+  const og = {};
+  for (const [key, value] of Object.entries(style)) {
+    og[key] = element.style[key];
+    element.style[key] = value;
+  }
+  return og;
+}
+
+CSS.SetStyle = function(element, style) {
+  for (const [key, value] of Object.entries(style)) {
+    element.style[key] = value;
+  }
+}
+

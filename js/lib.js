@@ -72,15 +72,6 @@ DT.Fetch = async (path, args, opts) => {
   }
 };
 
-DT.SetElementStyle = (element, style) => {
-  const og = {};
-  for (const [key, value] of Object.entries(style)) {
-    og[key] = element.style[key];
-    element.style[key] = value;
-  }
-  return og;
-};
-
 DT.DrawPoint = (pt, opt) => {
   opt = firstNotNone(opt, {});
   opt.stroke = parseColor(firstNotNone(opt.stroke, 'red'));
@@ -139,7 +130,7 @@ DT.DrawLine = (src, dst, opt) => {
       line.style.transform = [
         `translate(${center.x}px, ${center.y}px)`,
         `rotate(${theta}deg)`,
-        `scale(${scale})`,
+        `scaleX(${scale})`,
       ].join(' ');
       line.style.opacity = '1';
     },
@@ -354,7 +345,7 @@ DT.Anim.TugElement = async (tuggee, tugger) => {
 
   const both = func => [func(tuggee), func(tugger)];
 
-  let [tuggeeStyle, tuggerStyle] = both(t => DT.SetElementStyle(t, {
+  let [tuggeeStyle, tuggerStyle] = both(t => CSS.PushStyle(t, {
     transitionProperty: 'transform',
     transitionDuration,
     transitionTimingFunction: '',
@@ -398,8 +389,8 @@ DT.Anim.TugElement = async (tuggee, tugger) => {
     await new Promise(r => setTimeout(r, stepDurationMillis));
   }
 
-  DT.SetElementStyle(tuggee, tuggeeStyle);
-  DT.SetElementStyle(tugger, tuggerStyle);
+  CSS.SetStyle(tuggee, tuggeeStyle);
+  CSS.SetStyle(tugger, tuggerStyle);
 };
 
 DT.ItemKinds = item => {
@@ -621,7 +612,7 @@ DT.LocateUse = use => {
   }
 };
 
-DT.Reify = html => {
+DT.Reify = (html, source) => {
   const wrap = document.createElement('div');
   wrap.innerHTML = html;
   if (wrap.children.length === 1) {
@@ -631,6 +622,40 @@ DT.Reify = html => {
   }
   return wrap;
 };
+
+DT.BindLinkWarnings = function(node, remote, thief) {
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return;
+  }
+  if (node.hasAttribute('href')) {
+    let href = node.getAttribute('href');
+    if (!isEmpty(href) && remote !== window.location.origin) {
+      node.addEventListener('click', e => {
+        e.preventDefault();
+        const pre = document.createElement('pre');
+        popconfirm({
+          title: 'External Link Warning',
+          message: `
+            This link is loot "stolen" from another website by <a href="https://domthieves.gwen.run">DOM thief</a> ${thief};
+            it was originally from <a href="${remote}">${remote}</a>. The maintainers of the website you are currently on have <em>not</em> verified that it is safe; please only proceed if you trust the remote website.
+            <p>If you click 'proceed', you will continue on your merry way to:
+            <a href="${href}">$href{}</a>
+          `,
+          onConfirm: () => {
+            window.location = href;
+          },
+          confirmLabel: 'Proceed',
+          cancelLabel: 'Cancel',
+        });
+      });
+    }
+  }
+  if (!isNone(node.childNodes)) {
+    for (const child of node.childNodes) {
+      DT.BindLinkWarnings(child);
+    }
+  }
+}
 
 DT.PhantomClone = async item => {
   let original = null;
@@ -1087,6 +1112,7 @@ DT.Recruit = async (shoppingList) => {
       }
       thief.playReach(target);
       setTimeout(() => DT.Anim.ReplaceElement(item.dom, ['centroid', spriteblock], target).then(el => {
+        DT.BindLinkWarnings(el, item.home, item.stolen_by);
         el.setAttribute(
           'title',
           `Replacement for ${el.dataset.lootReplacementFor}, courtesy of ${thief.meta.name} for the price of ${item.price} WP (web pieces). Originally stolen from ${item.home} by ${item.stolen_by}.`,
@@ -1240,17 +1266,19 @@ DT.Recruit = async (shoppingList) => {
         if (hole.dataset.lootPhantom) {
           continue;
         }
-        const kind = DT.ItemKind(hole);
-        if (isEmpty(kind)) {
+        const kinds = DT.ItemKinds(hole);
+        if (isEmpty(kinds)) {
           continue;
         }
-        for (const item of thief.sack) {
-          if (item.stolenHere) {
-            continue
-          }
-          if (item.uses.some(k => k === kind)) {
-            thief.place(item, hole);
-            return;
+        for (const kind of kinds) {
+          for (const item of thief.sack) {
+            if (item.stolenHere) {
+              continue
+            }
+            if (item.uses.some(k => k === kind)) {
+              thief.place(item, hole);
+              return;
+            }
           }
         }
       }
@@ -1478,6 +1506,7 @@ DT.Initialize = async () => {
 
   DT.DOM = DOM;
   DT.Geom = Geom;
+  DT.Popconfirm = popconfirm;
 
   DT.mainLoop = async () => {
     const loop = (mult) => setTimeout(DT.mainLoop, DT.mainLoopDelay * (isSome(mult) ? mult : 1));

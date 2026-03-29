@@ -4,7 +4,7 @@ const DOM = {
   deniedAttrPrefixes: {},
 };
 
-DOM.CleanClone = async original => {
+DOM.CleanClone = async function(original) {
   switch (original.nodeType) {
     case Node.ELEMENT_NODE:
       break
