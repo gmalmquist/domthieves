@@ -2,13 +2,13 @@ package api
 
 import (
   "domthieves/config"
-  "domthieves/jsv"
   "domthieves/loot"
   "domthieves/names"
-  "domthieves/netutil"
-  "domthieves/storeutil"
   "domthieves/thief"
 
+  "github.com/gmalmquist/flowershop/iot"
+  "github.com/gmalmquist/flowershop/jsv"
+  "github.com/gmalmquist/flowershop/numux"
   "github.com/google/uuid"
 
   "fmt"
@@ -25,7 +25,7 @@ const Version string = "0.0.1"
 var MaxGenBatchSize int = 100
 
 type Api struct {
-  Mux *netutil.Mux
+  Mux *numux.NuMux
   Health Health
   Guilds *thief.Directory
   NameGen *names.NameGen
@@ -38,7 +38,7 @@ type Health struct {
 
 func New() *Api {
   api := &Api{
-    Mux: netutil.NuMux(),
+    Mux: numux.New(),
     Health: Health{
       Status: "initializing",
     },
@@ -48,7 +48,7 @@ func New() *Api {
 }
 
 func (api *Api) Setup() {
-  type Nu = *netutil.Nu
+  type Nu = *numux.Nu
   mux := api.Mux
   mux.AllowAllCors = true
 
@@ -60,11 +60,11 @@ func (api *Api) Setup() {
 
   bundle := []byte(JsBundle())
 
-  mux.Handle("GET /health", func(nu Nu) {
+  mux.HandleFunc("GET /health", func(nu Nu) {
     nu.ReplyJson(api.Health)
   })
 
-  mux.Handle("GET /domthieves.js", func(nu Nu) {
+  mux.HandleFunc("GET /domthieves.js", func(nu Nu) {
     w, _ := nu.Unwrap()
 
     blob := bundle
@@ -86,15 +86,15 @@ func (api *Api) Setup() {
     fmt.Fprint(w, "})();\n")
   })
 
-  mux.Handle("GET /api/server/maxrequestsize", func(nu Nu) {
+  mux.HandleFunc("GET /api/server/maxrequestsize", func(nu Nu) {
     nu.ReplyJson(config.Conf.MaxRequestSize)
   })
 
-  mux.Handle("GET /api/server/uuid", func(nu Nu) {
+  mux.HandleFunc("GET /api/server/uuid", func(nu Nu) {
     nu.ReplyPlaintext(uuid.NewString())
   })
 
-  mux.Handle("GET /api/guild/{gid}/thief/{tid}", func(nu Nu) {
+  mux.HandleFunc("GET /api/guild/{gid}/thief/{tid}", func(nu Nu) {
     _, r := nu.Unwrap()
     gid := thief.GuildID(r.PathValue("gid"))
     tid := thief.ThiefID(r.PathValue("tid"))
@@ -114,7 +114,7 @@ func (api *Api) Setup() {
     nu.ReplyJson(thief)
   })
 
-  mux.Handle("GET /api/guild/{gid}", func(nu Nu) {
+  mux.HandleFunc("GET /api/guild/{gid}", func(nu Nu) {
     w, r := nu.Unwrap()
     gid := thief.GuildID(r.PathValue("gid"))
     
@@ -129,7 +129,7 @@ func (api *Api) Setup() {
     w.Write(blob)
   })
 
-  mux.Handle("GET /api/guild/{gid}/active", func(nu Nu) {
+  mux.HandleFunc("GET /api/guild/{gid}/active", func(nu Nu) {
     _, r := nu.Unwrap()
     gid := thief.GuildID(r.PathValue("gid"))
     
@@ -143,7 +143,7 @@ func (api *Api) Setup() {
     nu.ReplyJson(active)
   })
 
-  mux.Handle("GET /api/guild/{gid}/recruit", func(nu Nu) {
+  mux.HandleFunc("GET /api/guild/{gid}/recruit", func(nu Nu) {
     _, r := nu.Unwrap()
     gid := thief.GuildID(r.PathValue("gid"))
     
@@ -174,12 +174,12 @@ func (api *Api) Setup() {
     nu.ReplyJson(thief)
   })
 
-  mux.Handle("OPTIONS /api/guild/{gid}/return/{tid}", func(nu Nu) {
+  mux.HandleFunc("OPTIONS /api/guild/{gid}/return/{tid}", func(nu Nu) {
     w, _ := nu.Unwrap()
     w.WriteHeader(200)
   })
 
-  mux.Handle("POST /api/guild/{gid}/return/{tid}", func(nu Nu) {
+  mux.HandleFunc("POST /api/guild/{gid}/return/{tid}", func(nu Nu) {
     _, r := nu.Unwrap()
     gid := thief.GuildID(r.PathValue("gid"))
     tid := thief.ThiefID(r.PathValue("tid"))
@@ -194,11 +194,11 @@ func (api *Api) Setup() {
     nu.ReplyPlaintext("welcome home! :)")
   })
 
-  mux.Handle("OPTIONS /api/guild/{gid}/deposit", func(nu Nu) {
+  mux.HandleFunc("OPTIONS /api/guild/{gid}/deposit", func(nu Nu) {
     w, _ := nu.Unwrap()
     w.WriteHeader(200)
   })
-  mux.Handle("POST /api/guild/{gid}/deposit", func(nu Nu) {
+  mux.HandleFunc("POST /api/guild/{gid}/deposit", func(nu Nu) {
     w, r := nu.Unwrap()
 
     gid := thief.GuildID(r.PathValue("gid"))
@@ -256,19 +256,19 @@ func (api *Api) Setup() {
     nu.ReplyPlaintext("ok");
   })
 
-  mux.Handle("GET /api/allowhtml/tags", func(nu Nu) {
+  mux.HandleFunc("GET /api/allowhtml/tags", func(nu Nu) {
     nu.ReplyJson(loot.AllowTags)
   })
 
-  mux.Handle("GET /api/denyhtml/attrs", func(nu Nu) {
+  mux.HandleFunc("GET /api/denyhtml/attrs", func(nu Nu) {
     nu.ReplyJson(loot.DenyAttributes)
   })
 
-  mux.Handle("GET /api/denyhtml/attr-prefixes", func(nu Nu) {
+  mux.HandleFunc("GET /api/denyhtml/attr-prefixes", func(nu Nu) {
     nu.ReplyJson(loot.DenyAttrPrefixes)
   })
 
-  mux.Handle("GET /api/name", func(nu Nu) {
+  mux.HandleFunc("GET /api/name", func(nu Nu) {
     w, r := nu.Unwrap()
     q := r.URL.Query()
 
@@ -307,7 +307,7 @@ func (api *Api) Setup() {
   })
 
   fs := http.FileServer(http.Dir("./www"))
-  mux.Handle("/", func(nu Nu) {
+  mux.HandleFunc("/", func(nu Nu) {
     w, r := nu.Unwrap()
     fs.ServeHTTP(w, r)
   })
@@ -325,7 +325,7 @@ func Ready() Health {
 
 func JsBundle() string {
   var b strings.Builder
-  for f := range storeutil.IterFiles("js", func(e os.DirEntry) bool {
+  for f := range iot.IterFiles("js", func(e os.DirEntry) bool {
     return filepath.Ext(e.Name()) == ".js"
   }) {
     data, err := os.ReadFile(filepath.Join("js", f))

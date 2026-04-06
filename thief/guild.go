@@ -2,11 +2,11 @@ package thief
 
 import (
   "domthieves/config"
-  "domthieves/jsv"
   "domthieves/loot"
   "domthieves/names"
 
   "github.com/gammazero/deque"
+  "github.com/gmalmquist/flowershop/jsv"
   "github.com/google/uuid"
 
   "hash/maphash"

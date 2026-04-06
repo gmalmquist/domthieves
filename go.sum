@@ -1,5 +1,11 @@
 github.com/gammazero/deque v1.2.1 h1:9fnQVFCCZ9/NOc7ccTNqzoKd1tCWOqeI05/lPqFPMGQ=
 github.com/gammazero/deque v1.2.1/go.mod h1:5nSFkzVm+afG9+gy0VIowlqVAW4N8zNcMne+CMQVD2g=
+github.com/gmalmquist/flowershop v0.0.1 h1:PZwGu1hB+2IC5iYX1ogp9Ulxenun5SFvq+FLrfRcrxk=
+github.com/gmalmquist/flowershop v0.0.1/go.mod h1:77yO8cdHC3OrKVzAHF/am/VhtZRuAZ4eIjxDCHDNNRc=
+github.com/gmalmquist/flowershop v0.0.2 h1:v5cIHzw6RicPQjffjj2iUZyBqWigBXVgUAy/sfu1h1Q=
+github.com/gmalmquist/flowershop v0.0.2/go.mod h1:77yO8cdHC3OrKVzAHF/am/VhtZRuAZ4eIjxDCHDNNRc=
+github.com/gmalmquist/flowershop v0.0.3 h1:7flCfw5jF1jGskntfvP7mPy+OIEqD7NraCTLjNJxhlY=
+github.com/gmalmquist/flowershop v0.0.3/go.mod h1:77yO8cdHC3OrKVzAHF/am/VhtZRuAZ4eIjxDCHDNNRc=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 golang.org/x/net v0.52.0 h1:He/TN1l0e4mmR3QqHMT2Xab3Aj3L9qjbhRm78/6jrW0=

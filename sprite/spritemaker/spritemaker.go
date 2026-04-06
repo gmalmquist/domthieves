@@ -1,9 +1,10 @@
 package spritemaker
 
 import (
-  "domthieves/jsv"
-  "domthieves/rutil"
   "domthieves/sprite"
+
+  "github.com/gmalmquist/flowershop/jsv"
+  "github.com/gmalmquist/flowershop/regu"
 
   "errors"
   "fmt"
@@ -394,7 +395,7 @@ func parseColor(s string) (color.RGBA, error) {
     return c(0, 128, 128, 128)
   }
   transparent := color.RGBA{}
-  if m := rutil.RegMatch(reHexColor, s); m != nil {
+  if m := regu.RegMatch(reHexColor, s); m != nil {
     snum := m["num"]
     var sr, sg, sb string
     if len(snum) == 3{
@@ -418,7 +419,7 @@ func parseColor(s string) (color.RGBA, error) {
     if b, err = strconv.ParseUint(sb, 16, 8); err != nil { return transparent, err }
     return c(uint8(r), uint8(g), uint8(b), 255)
   }
-  if m := rutil.RegMatch(reDecTriple, s); m != nil {
+  if m := regu.RegMatch(reDecTriple, s); m != nil {
     sr, sg, sb := m["r"], m["g"], m["b"]
     var r, g, b uint64
     var err error

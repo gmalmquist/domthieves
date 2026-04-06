@@ -1,9 +1,10 @@
 package names
 
 import (
-  "domthieves/storeutil"
   "domthieves/config"
-  "domthieves/rutil"
+
+  "github.com/gmalmquist/flowershop/iot"
+  "github.com/gmalmquist/flowershop/regu"
 
   "bufio"
   "fmt"
@@ -57,7 +58,7 @@ func (g *NameGen) Register(c *Culture) {
 }
 
 func (g *NameGen) LoadAll() error {
-  for path := range storeutil.IterPaths(
+  for path := range iot.IterPaths(
     config.Conf.NameRoot(), "culture",
   ) {
     c, err := LoadCulture(path)
@@ -101,7 +102,7 @@ func LoadCulture(path string) (*Culture, error) {
     }
 
     if currSet == nil {
-      m := rutil.RegMatch(reProperty, line)
+      m := regu.RegMatch(reProperty, line)
       if m != nil {
         key := strings.ToUpper(m["name"])
         switch key {
@@ -114,7 +115,7 @@ func LoadCulture(path string) (*Culture, error) {
     }
 
     if line[0] == '[' {
-      m := rutil.RegMatch(reNameSetHeader, line)
+      m := regu.RegMatch(reNameSetHeader, line)
       if m == nil {
         return nil, mkerr("invalid header syntax")
       }
@@ -171,7 +172,7 @@ func LoadCulture(path string) (*Culture, error) {
       // if we have a current set but haven't
       // yet added any names to it, there are
       // possibly properties set for it
-      m := rutil.RegMatch(reProperty, line)
+      m := regu.RegMatch(reProperty, line)
       if m != nil {
         key := strings.ToUpper(m["name"])
         val := strings.TrimSpace(m["value"])
